@@ -246,22 +246,23 @@ git push -u origin main
 
 ### Backend no Render (Web Service)
 
+O repositório já inclui um [`render.yaml`](render.yaml) na raiz (Render Blueprint),
+configurando o serviço automaticamente: root directory `backend`, build
+(`npm install && npm run build`), start (`npm start`) e plano free.
+
 1. Crie uma conta em [render.com](https://render.com) (grátis, sem cartão).
-2. **New +** → **Web Service** → conecte o repositório do GitHub.
-3. Configure:
-   - **Root Directory**: `backend`
-   - **Runtime**: Node
-   - **Build Command**: `npm install && npm run build`
-   - **Start Command**: `npm start`
-   - **Instance Type**: Free
-4. Em **Environment**, adicione as variáveis:
-   - `CORS_ORIGIN` → a URL do frontend (você define depois de implantá-lo, ex:
-     `https://nima-orcamento.vercel.app`)
-   - `DATABASE_PATH` → `/opt/render/project/src/backend/data/budgets.db` (opcional;
-     sem essa variável, o padrão relativo já funciona)
-   - Render injeta `PORT` automaticamente — o servidor já lê `process.env.PORT`.
-5. Clique em **Create Web Service**. Ao final, você terá uma URL como
+2. **New +** → **Blueprint** → conecte o repositório do GitHub → o Render detecta
+   o `render.yaml` e propõe criar o serviço `nima-backend` automaticamente.
+3. Na tela de revisão, defina o valor da variável `CORS_ORIGIN` (marcada como
+   `sync: false`, então o Render pede para preenchê-la) — pode deixar em branco
+   por enquanto e voltar depois de implantar o frontend.
+4. Clique em **Apply**. Ao final, você terá uma URL como
    `https://nima-backend.onrender.com`.
+
+> Se a criação via Blueprint falhar ou você preferir configurar manualmente, crie um
+> **New + → Web Service** apontando para o repositório e preencha os mesmos campos
+> que estão no `render.yaml` (Root Directory `backend`, Build/Start Command acima,
+> Instance Type Free) — o resultado é idêntico.
 
 **Importante sobre persistência no plano gratuito**: o disco do Render Free é
 **efêmero** — ele não some entre requisições, mas é **resetado a cada novo deploy**
@@ -275,23 +276,23 @@ persistência real e contínua em produção, os caminhos são:
 
 Para uma demonstração ao time ou uso leve, o comportamento atual já é suficiente.
 
-### Frontend no Render (Static Site) ou Vercel
+### Frontend na Vercel
 
-**Opção A — tudo no Render:**
-1. **New +** → **Static Site** → mesmo repositório.
-2. **Root Directory**: `frontend`
-3. **Build Command**: `npm install && npm run build`
-4. **Publish Directory**: `dist`
-5. Variável de ambiente: `VITE_API_URL` → `https://nima-backend.onrender.com/api`
+O `frontend/` já inclui um [`vercel.json`](frontend/vercel.json) com o build
+configurado (`framework: vite`, `outputDirectory: dist`).
 
-**Opção B — frontend na Vercel** (como perguntado anteriormente): importe o
-repositório na Vercel, defina **Root Directory** como `frontend` (framework
-detectado automaticamente como Vite) e adicione a mesma variável `VITE_API_URL`
-apontando para a URL do backend no Render.
+1. Crie uma conta em [vercel.com](https://vercel.com) (grátis) e clique em
+   **Add New → Project**, conectando o mesmo repositório do GitHub.
+2. Em **Root Directory**, selecione `frontend` (a Vercel detecta o framework Vite
+   automaticamente a partir do `vercel.json`).
+3. Em **Environment Variables**, adicione `VITE_API_URL` →
+   `https://nima-backend.onrender.com/api` (use a URL real gerada pelo Render).
+4. Clique em **Deploy**. Você terá uma URL como
+   `https://calculadora-nima.vercel.app`.
 
-Depois de implantar o frontend, volte ao backend no Render e atualize
-`CORS_ORIGIN` com a URL final do frontend, para o navegador não bloquear as
-requisições por CORS.
+Depois de implantar o frontend, volte ao serviço `nima-backend` no Render
+(**Environment**) e defina `CORS_ORIGIN` com essa URL final da Vercel, para o
+navegador não bloquear as requisições por CORS.
 
 ---
 

@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: nima-backend
+    env: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: CORS_ORIGIN
+        sync: false
+      - key: DATABASE_PATH
+        value: ./data/budgets.db
