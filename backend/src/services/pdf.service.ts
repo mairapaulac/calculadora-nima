@@ -5,8 +5,7 @@ import { formatBRL } from "../utils/currency.utils";
 
 const SERVICE_LABELS = {
   material: "Material",
-  energy: "Energia",
-  machineWear: "Desgaste da maquina",
+  machine: "Custo de Maquina",
   modeling: "Modelagem 3D",
   scanning: "Escaneamento 3D",
   slicing: "Fatiamento",
@@ -85,8 +84,7 @@ function sectionTitle(doc: PDFKit.PDFDocument, title: string): void {
 function renderCostTable(doc: PDFKit.PDFDocument, budget: Budget): void {
   const rows: Array<[string, number]> = [
     [SERVICE_LABELS.material, budget.costs.materialCost],
-    [SERVICE_LABELS.energy, budget.costs.energyCost],
-    [SERVICE_LABELS.machineWear, budget.costs.machineWearCost],
+    [SERVICE_LABELS.machine, budget.costs.machineCost],
     [SERVICE_LABELS.modeling, budget.costs.modelingCost],
     [SERVICE_LABELS.scanning, budget.costs.scanningCost],
     [SERVICE_LABELS.slicing, budget.costs.slicingCost],

@@ -26,26 +26,22 @@ export function simulateBudget(input: BudgetInput, config: AppConfig): CostBreak
     ? round2((input.print.weightInGrams || 0) * material.pricePerGram)
     : 0;
 
-  const energyConsumedKwh =
-    (config.calculationParameters.printerPowerWatts / 1000) * printTimeDecimalHours;
-  const energyCost = round2(energyConsumedKwh * config.calculationParameters.kwhPrice);
-
-  const machineWearCost = round2(
-    printTimeDecimalHours * config.calculationParameters.machineWearPerHour
-  );
+  const effectiveMachineCostPerHour =
+    config.calculationParameters.machineCostPerHour *
+    (1 + config.calculationParameters.machineCostMarkupPercentage / 100);
+  const machineCost = round2(printTimeDecimalHours * effectiveMachineCostPerHour);
 
   const modelingCost = calculateServiceCost(input.services.modeling);
   const scanningCost = calculateServiceCost(input.services.scanning);
   const slicingCost = calculateServiceCost(input.services.slicing);
 
   const total = round2(
-    materialCost + energyCost + machineWearCost + modelingCost + scanningCost + slicingCost
+    materialCost + machineCost + modelingCost + scanningCost + slicingCost
   );
 
   return {
     materialCost,
-    energyCost,
-    machineWearCost,
+    machineCost,
     modelingCost,
     scanningCost,
     slicingCost,

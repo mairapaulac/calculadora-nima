@@ -30,15 +30,12 @@ export function calculateBudget(input: BudgetInput): {
   // 1. Custo de material = peso (g) x valor por grama do filamento
   const materialCost = round2(input.print.weightInGrams * material.pricePerGram);
 
-  // 2. Consumo de energia
-  const energyConsumedKwh =
-    (calculationParameters.printerPowerWatts / 1000) * printTimeDecimalHours;
-  const energyCost = round2(energyConsumedKwh * calculationParameters.kwhPrice);
-
-  // 3. Desgaste da maquina
-  const machineWearCost = round2(
-    printTimeDecimalHours * calculationParameters.machineWearPerHour
-  );
+  // 2. Custo de maquina (energia + desgaste combinados em um valor por hora,
+  //    acrescido da margem configurada)
+  const effectiveMachineCostPerHour =
+    calculationParameters.machineCostPerHour *
+    (1 + calculationParameters.machineCostMarkupPercentage / 100);
+  const machineCost = round2(printTimeDecimalHours * effectiveMachineCostPerHour);
 
   // Servicos adicionais
   const modelingCost = calculateServiceCost(input.services.modeling);
@@ -46,18 +43,12 @@ export function calculateBudget(input: BudgetInput): {
   const slicingCost = calculateServiceCost(input.services.slicing);
 
   const total = round2(
-    materialCost +
-      energyCost +
-      machineWearCost +
-      modelingCost +
-      scanningCost +
-      slicingCost
+    materialCost + machineCost + modelingCost + scanningCost + slicingCost
   );
 
   const costs: CostBreakdown = {
     materialCost,
-    energyCost,
-    machineWearCost,
+    machineCost,
     modelingCost,
     scanningCost,
     slicingCost,
@@ -66,7 +57,6 @@ export function calculateBudget(input: BudgetInput): {
 
   const details: CalculationDetails = {
     printTimeDecimalHours: round2(printTimeDecimalHours),
-    energyConsumedKwh: round2(energyConsumedKwh),
     materialUsed: material,
   };
 

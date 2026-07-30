@@ -49,8 +49,7 @@ export async function generateBudgetDocx(budget: Budget): Promise<Buffer> {
 
   const costRows: Array<[string, number]> = [
     ["Material", budget.costs.materialCost],
-    ["Energia", budget.costs.energyCost],
-    ["Desgaste da maquina", budget.costs.machineWearCost],
+    ["Custo de Maquina", budget.costs.machineCost],
     ["Modelagem 3D", budget.costs.modelingCost],
     ["Escaneamento 3D", budget.costs.scanningCost],
     ["Fatiamento", budget.costs.slicingCost],

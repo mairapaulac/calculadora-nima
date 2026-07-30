@@ -7,8 +7,7 @@ import { FormErrors, validateBudgetInput } from "../utils/validation";
 
 const EMPTY_COSTS: CostBreakdown = {
   materialCost: 0,
-  energyCost: 0,
-  machineWearCost: 0,
+  machineCost: 0,
   modelingCost: 0,
   scanningCost: 0,
   slicingCost: 0,

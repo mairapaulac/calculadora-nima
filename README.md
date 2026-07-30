@@ -21,7 +21,7 @@ calculadoraNima/
 │   ├── src/
 │   │   ├── config/                 # Arquivos de configuração editáveis
 │   │   │   ├── materials.config.ts   # Materiais/filamentos e preços
-│   │   │   ├── pricing.config.ts     # Potência, kWh, desgaste, dados do lab
+│   │   │   ├── pricing.config.ts     # Custo de máquina/hora, dados do lab
 │   │   │   ├── labMembers.config.ts  # Integrantes do laboratório
 │   │   │   └── index.ts
 │   │   ├── types/
@@ -106,8 +106,7 @@ calculadoraNima/
 | Custo             | Fórmula                                                          |
 |-------------------|-------------------------------------------------------------------|
 | Material          | `peso (g) × valor por grama do filamento`                         |
-| Energia           | `(potência da impressora (W) ÷ 1000) × tempo (h) × valor do kWh`  |
-| Desgaste          | `tempo de impressão (h) × valor de desgaste por hora`             |
+| Custo de Máquina  | `tempo de impressão (h) × custo de máquina por hora` (energia + desgaste combinados) |
 | Modelagem/Escaneamento/Fatiamento | `horas trabalhadas × valor por hora` (se habilitado) |
 | **Total**         | soma de todos os itens acima                                       |
 
@@ -116,9 +115,9 @@ calculadoraNima/
 - `backend/src/config/materials.config.ts` — nome, preço por kg de cada filamento
   (PLA, PETG, ABS, TPU, Nylon, Resina, Outros). O preço por grama é derivado
   automaticamente.
-- `backend/src/config/pricing.config.ts` — potência média da impressora (W),
-  valor do kWh, custo de desgaste por hora e dados do laboratório exibidos no
-  cabeçalho do orçamento.
+- `backend/src/config/pricing.config.ts` — custo de máquina por hora de impressão
+  (já engloba energia + desgaste) e dados do laboratório exibidos no cabeçalho
+  do orçamento.
 - `backend/src/config/labMembers.config.ts` — integrantes do laboratório que podem
   ser selecionados como responsáveis pela elaboração de um orçamento.
 

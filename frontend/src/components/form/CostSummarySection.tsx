@@ -8,8 +8,7 @@ interface CostSummarySectionProps {
 
 const ROWS: Array<{ key: keyof Omit<CostBreakdown, "total">; label: string }> = [
   { key: "materialCost", label: "Material" },
-  { key: "energyCost", label: "Energia" },
-  { key: "machineWearCost", label: "Desgaste da máquina" },
+  { key: "machineCost", label: "Custo de Máquina" },
   { key: "modelingCost", label: "Modelagem" },
   { key: "scanningCost", label: "Escaneamento" },
   { key: "slicingCost", label: "Fatiamento" },

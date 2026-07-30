@@ -64,8 +64,8 @@ export interface BudgetInput {
 /** Detalhamento de custos calculados pela camada de servicos. */
 export interface CostBreakdown {
   materialCost: number;
-  energyCost: number;
-  machineWearCost: number;
+  /** Custo de operacao da maquina (energia + desgaste combinados). */
+  machineCost: number;
   modelingCost: number;
   scanningCost: number;
   slicingCost: number;
@@ -74,7 +74,6 @@ export interface CostBreakdown {
 
 export interface CalculationDetails {
   printTimeDecimalHours: number;
-  energyConsumedKwh: number;
   materialUsed: MaterialConfig;
 }
 
@@ -88,9 +87,10 @@ export interface Budget {
 }
 
 export interface CalculationParameters {
-  printerPowerWatts: number;
-  kwhPrice: number;
-  machineWearPerHour: number;
+  /** Custo de operacao da maquina por hora de impressao (energia + desgaste combinados). */
+  machineCostPerHour: number;
+  /** Margem (%) aplicada em cima do custo de maquina por hora. */
+  machineCostMarkupPercentage: number;
 }
 
 export interface LabInfo {
