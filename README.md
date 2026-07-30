@@ -5,10 +5,11 @@ laboratório de manufatura aditiva calcular o custo de uma demanda de impressão
 visualizar o orçamento em tempo real e gerar um documento (PDF e/ou DOCX) formatado
 para envio ao solicitante.
 
-Esta primeira versão **não usa banco de dados** — os orçamentos gerados ficam em
-memória no processo do backend — mas toda a arquitetura já está preparada para a
-troca por um banco real sem impacto nas camadas de cálculo, controllers ou frontend
-(veja [Evoluções Futuras](#evoluções-futuras)).
+Esta primeira versão persiste os orçamentos em um arquivo **SQLite** local (sem
+serviço de banco externo) — veja a seção [Persistência](#6-persistência-sqlite) — e
+toda a arquitetura já está preparada para a troca por um banco gerenciado completo
+sem impacto nas camadas de cálculo, controllers ou frontend (veja
+[Evoluções Futuras](#8-evoluções-futuras)).
 
 ---
 
@@ -21,6 +22,7 @@ calculadoraNima/
 │   │   ├── config/                 # Arquivos de configuração editáveis
 │   │   │   ├── materials.config.ts   # Materiais/filamentos e preços
 │   │   │   ├── pricing.config.ts     # Potência, kWh, desgaste, dados do lab
+│   │   │   ├── labMembers.config.ts  # Integrantes do laboratório
 │   │   │   └── index.ts
 │   │   ├── types/
 │   │   │   └── budget.types.ts     # Tipagens de domínio
@@ -29,15 +31,17 @@ calculadoraNima/
 │   │   ├── utils/
 │   │   │   ├── time.utils.ts       # Conversão horas/minutos -> decimal
 │   │   │   ├── currency.utils.ts   # Formatação BRL / arredondamento
-│   │   │   ├── id.utils.ts         # Geração do número do orçamento
+│   │   │   ├── id.utils.ts         # Geração do número do orçamento (sequência via SQLite)
 │   │   │   └── asyncHandler.ts
 │   │   ├── services/               # Regras de negócio centralizadas
 │   │   │   ├── calculation.service.ts  # Fórmulas de custo (fonte da verdade)
 │   │   │   ├── budget.service.ts       # Orquestra cálculo + persistência
 │   │   │   ├── pdf.service.ts          # Geração do PDF (pdfkit)
 │   │   │   └── docx.service.ts         # Geração do DOCX (docx)
+│   │   ├── database/
+│   │   │   └── db.ts               # Conexão SQLite (node:sqlite)
 │   │   ├── repositories/
-│   │   │   └── budget.repository.ts # Armazenamento em memória (troque por DB aqui)
+│   │   │   └── budget.repository.ts # Armazenamento em SQLite (troque por outro DB aqui)
 │   │   ├── controllers/
 │   │   │   ├── budget.controller.ts
 │   │   │   └── materials.controller.ts
@@ -92,7 +96,7 @@ calculadoraNima/
 2. Ao clicar em **"Gerar Orçamento"**, os dados são validados e enviados para o
    backend (`POST /api/budgets`), que recalcula oficialmente com o
    `calculation.service.ts` do backend (fonte da verdade), gera um número de
-   orçamento e persiste em memória.
+   orçamento e persiste no SQLite.
 3. O operador pode então baixar o orçamento em **PDF** ou **DOCX**
    (`GET /api/budgets/:id/pdf` e `/docx`), prontos para envio ao solicitante.
 4. A aba **Dashboard** lista os orçamentos gerados e totais agregados.
@@ -115,6 +119,8 @@ calculadoraNima/
 - `backend/src/config/pricing.config.ts` — potência média da impressora (W),
   valor do kWh, custo de desgaste por hora e dados do laboratório exibidos no
   cabeçalho do orçamento.
+- `backend/src/config/labMembers.config.ts` — integrantes do laboratório que podem
+  ser selecionados como responsáveis pela elaboração de um orçamento.
 
 O frontend busca esses valores em `GET /api/config` na inicialização, então uma
 alteração no backend já reflete na simulação instantânea sem duplicar configuração.
@@ -123,7 +129,8 @@ alteração no backend já reflete na simulação instantânea sem duplicar conf
 
 ## 3. Instruções de Instalação
 
-Pré-requisitos: **Node.js 18+** e **npm**.
+Pré-requisitos: **Node.js 22.5+** (o backend usa o módulo nativo `node:sqlite` para
+persistência) e **npm**.
 
 ```powershell
 # Backend
@@ -193,17 +200,109 @@ npm run typecheck   # roda apenas a checagem de tipos (backend e frontend)
 
 ---
 
-## 6. Evoluções Futuras
+## 6. Persistência (SQLite)
 
-### Persistência em banco de dados
-- A única camada que precisa mudar é `backend/src/repositories/budget.repository.ts`:
-  troque o `Map` em memória por um cliente de banco (ex: **Prisma** + PostgreSQL,
-  ou MongoDB) mantendo a mesma interface (`save`, `findById`, `list`).
-- Adicionar tabelas/coleções para `budgets`, `materials` (tornando a configuração de
-  materiais editável via painel administrativo em vez de arquivo estático) e
-  `users` (para autenticação, abaixo).
-- Persistir o contador de numeração de orçamento (`id.utils.ts`) no banco em vez de
-  em memória, evitando reinício zerar a sequência.
+Os orçamentos são armazenados em um arquivo **SQLite** local (`backend/data/budgets.db`
+por padrão, configurável via `DATABASE_PATH`), usando o módulo nativo `node:sqlite`
+do próprio Node.js — **sem dependências externas** e sem necessidade de compilação
+nativa (por isso não usamos `better-sqlite3`: exige Visual Studio Build Tools/
+node-gyp para compilar em máquinas sem binário pré-compilado para a versão do Node
+em uso).
+
+> Requer **Node.js 22.5+** (o `node:sqlite` é experimental — o Node imprime um aviso
+> no console ao iniciar, mas funciona normalmente).
+
+O orçamento inteiro é salvo como JSON na coluna `payload`; é suficiente para o
+volume e as consultas deste sistema. Ao evoluir para um banco relacional completo
+(Postgres, etc.), a única camada que muda é `backend/src/repositories/budget.repository.ts`
+e `backend/src/utils/id.utils.ts` (numeração sequencial) — mantendo a mesma interface
+pública (`save`, `findById`, `list`).
+
+---
+
+## 7. Deploy Gratuito (Render + Vercel)
+
+Como o frontend e o backend já são dois projetos independentes, cada um é implantado
+separadamente, sem custo.
+
+### Pré-requisito: subir o código para o GitHub
+
+O Render (e a Vercel) implantam a partir de um repositório Git. Se este projeto
+ainda não é um repositório:
+
+```powershell
+git init
+git add .
+git commit -m "Versão inicial do sistema de orçamento NIMA"
+```
+
+Crie um repositório vazio no GitHub e depois:
+
+```powershell
+git remote add origin https://github.com/SEU_USUARIO/calculadora-nima.git
+git branch -M main
+git push -u origin main
+```
+
+### Backend no Render (Web Service)
+
+1. Crie uma conta em [render.com](https://render.com) (grátis, sem cartão).
+2. **New +** → **Web Service** → conecte o repositório do GitHub.
+3. Configure:
+   - **Root Directory**: `backend`
+   - **Runtime**: Node
+   - **Build Command**: `npm install && npm run build`
+   - **Start Command**: `npm start`
+   - **Instance Type**: Free
+4. Em **Environment**, adicione as variáveis:
+   - `CORS_ORIGIN` → a URL do frontend (você define depois de implantá-lo, ex:
+     `https://nima-orcamento.vercel.app`)
+   - `DATABASE_PATH` → `/opt/render/project/src/backend/data/budgets.db` (opcional;
+     sem essa variável, o padrão relativo já funciona)
+   - Render injeta `PORT` automaticamente — o servidor já lê `process.env.PORT`.
+5. Clique em **Create Web Service**. Ao final, você terá uma URL como
+   `https://nima-backend.onrender.com`.
+
+**Importante sobre persistência no plano gratuito**: o disco do Render Free é
+**efêmero** — ele não some entre requisições, mas é **resetado a cada novo deploy**
+(e possivelmente após longos períodos de inatividade, quando o serviço "dorme" e
+sobe em uma nova instância). Ou seja, o SQLite evita perda de dados por *crash* do
+processo, mas não substitui um disco persistente de verdade nesse plano. Para
+persistência real e contínua em produção, os caminhos são:
+- Adicionar um **Persistent Disk** do Render (pago, a partir de poucos dólares/mês); ou
+- Migrar para um banco gerenciado com camada gratuita própria, ex: **Neon** ou
+  **Supabase** (Postgres) — ver seção de evoluções futuras abaixo.
+
+Para uma demonstração ao time ou uso leve, o comportamento atual já é suficiente.
+
+### Frontend no Render (Static Site) ou Vercel
+
+**Opção A — tudo no Render:**
+1. **New +** → **Static Site** → mesmo repositório.
+2. **Root Directory**: `frontend`
+3. **Build Command**: `npm install && npm run build`
+4. **Publish Directory**: `dist`
+5. Variável de ambiente: `VITE_API_URL` → `https://nima-backend.onrender.com/api`
+
+**Opção B — frontend na Vercel** (como perguntado anteriormente): importe o
+repositório na Vercel, defina **Root Directory** como `frontend` (framework
+detectado automaticamente como Vite) e adicione a mesma variável `VITE_API_URL`
+apontando para a URL do backend no Render.
+
+Depois de implantar o frontend, volte ao backend no Render e atualize
+`CORS_ORIGIN` com a URL final do frontend, para o navegador não bloquear as
+requisições por CORS.
+
+---
+
+## 8. Evoluções Futuras
+
+### Banco de dados relacional completo
+- Trocar `backend/src/repositories/budget.repository.ts` por um ORM (ex: **Prisma**)
+  apontando para Postgres gerenciado (Neon, Supabase, Render Postgres).
+- Normalizar `materials` e `labMembers` em tabelas próprias, com painel
+  administrativo para editá-los sem precisar de redeploy.
+- Adicionar tabela `users` (para autenticação, abaixo).
 
 ### Autenticação e autorização
 - Adicionar login (ex: JWT ou sessão) para diferenciar operadores do laboratório.
