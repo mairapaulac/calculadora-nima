@@ -6,8 +6,9 @@ import { TextAreaInput } from "../common/TextAreaInput";
 import { AdditionalServicesSection } from "./AdditionalServicesSection";
 import { AttendantSection } from "./AttendantSection";
 import { CostSummarySection } from "./CostSummarySection";
-import { PrintSection } from "./PrintSection";
+import { PrintItemsSection } from "./PrintItemsSection";
 import { RequesterSection } from "./RequesterSection";
+import { ScanItemsSection } from "./ScanItemsSection";
 
 async function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
@@ -30,7 +31,7 @@ export function BudgetForm({ onBudgetCreated }: BudgetFormProps) {
     configError,
     input,
     updateInput,
-    costs,
+    totals,
     errors,
     submitting,
     submitError,
@@ -72,7 +73,8 @@ export function BudgetForm({ onBudgetCreated }: BudgetFormProps) {
       <div className="flex flex-col gap-6 lg:col-span-2">
         <AttendantSection input={input} config={config} errors={errors} onChange={updateInput} />
         <RequesterSection input={input} errors={errors} onChange={updateInput} />
-        <PrintSection input={input} config={config} errors={errors} onChange={updateInput} />
+        <PrintItemsSection input={input} config={config} errors={errors} onChange={updateInput} />
+        <ScanItemsSection input={input} config={config} errors={errors} onChange={updateInput} />
         <AdditionalServicesSection input={input} errors={errors} onChange={updateInput} />
         <Card title="Observações" subtitle="Campo livre para observações adicionais">
           <TextAreaInput
@@ -84,7 +86,7 @@ export function BudgetForm({ onBudgetCreated }: BudgetFormProps) {
       </div>
 
       <div className="flex flex-col gap-6">
-        <CostSummarySection costs={costs} />
+        <CostSummarySection input={input} totals={totals} />
 
         <Card title="Gerar Orçamento">
           <div className="flex flex-col gap-3">

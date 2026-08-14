@@ -9,5 +9,5 @@ services:
     envVars:
       - key: CORS_ORIGIN
         sync: false
-      - key: DATABASE_PATH
-        value: ./data/budgets.db
+      - key: DATABASE_URL
+        sync: false

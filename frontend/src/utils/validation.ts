@@ -1,15 +1,22 @@
 import { BudgetInput } from "../types/budget.types";
 
+export interface ItemErrors {
+  itemName?: string;
+  weightInGrams?: string;
+  printTime?: string;
+  scanTimeHours?: string;
+  postProcessing?: string;
+}
+
 export type FormErrors = Partial<{
   attendedBy: string;
   name: string;
   email: string;
   projectDescription: string;
-  weightInGrams: string;
-  printTime: string;
+  items: string;
   modelingHours: string;
-  scanningHours: string;
-  slicingHours: string;
+  printItems: ItemErrors[];
+  scanItems: ItemErrors[];
 }>;
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -31,27 +38,45 @@ export function validateBudgetInput(input: BudgetInput): FormErrors {
   }
 
   if (!input.requester.projectDescription.trim()) {
-    errors.projectDescription = "Descreva a peca/projeto.";
+    errors.projectDescription = "Descreva a peça/projeto.";
   }
 
-  if (!input.print.weightInGrams || input.print.weightInGrams <= 0) {
-    errors.weightInGrams = "Peso deve ser maior que zero.";
+  if (input.printItems.length + input.scanItems.length === 0) {
+    errors.items = "Adicione ao menos um item de impressão ou escaneamento.";
   }
 
-  if (input.print.printTime.hours === 0 && input.print.printTime.minutes === 0) {
-    errors.printTime = "Informe o tempo de impressao.";
+  const printItemErrors: ItemErrors[] = input.printItems.map((item) => {
+    const itemError: ItemErrors = {};
+    if (!item.itemName.trim()) itemError.itemName = "Informe o nome da peça/demanda.";
+    if (!item.weightInGrams || item.weightInGrams <= 0) {
+      itemError.weightInGrams = "Peso deve ser maior que zero.";
+    }
+    if (item.printTime.hours === 0 && item.printTime.minutes === 0) {
+      itemError.printTime = "Informe o tempo de impressão.";
+    }
+    return itemError;
+  });
+  if (printItemErrors.some((e) => Object.keys(e).length > 0)) {
+    errors.printItems = printItemErrors;
+  }
+
+  const scanItemErrors: ItemErrors[] = input.scanItems.map((item) => {
+    const itemError: ItemErrors = {};
+    if (!item.itemName.trim()) itemError.itemName = "Informe o nome da peça.";
+    if (!item.scanTimeHours || item.scanTimeHours <= 0) {
+      itemError.scanTimeHours = "Tempo de escaneamento deve ser maior que zero.";
+    }
+    if (!item.postProcessing.trim()) {
+      itemError.postProcessing = "Informe o pós-processamento/malha.";
+    }
+    return itemError;
+  });
+  if (scanItemErrors.some((e) => Object.keys(e).length > 0)) {
+    errors.scanItems = scanItemErrors;
   }
 
   if (input.services.modeling.enabled && input.services.modeling.hours <= 0) {
     errors.modelingHours = "Informe as horas de modelagem.";
-  }
-
-  if (input.services.scanning.enabled && input.services.scanning.hours <= 0) {
-    errors.scanningHours = "Informe as horas de escaneamento.";
-  }
-
-  if (input.services.slicing.enabled && input.services.slicing.hours <= 0) {
-    errors.slicingHours = "Informe as horas de fatiamento.";
   }
 
   return errors;

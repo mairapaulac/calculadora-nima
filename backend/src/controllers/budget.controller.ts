@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { calculateBudget } from "../services/calculation.service";
+import { calculateBudgetTotals } from "../services/calculation.service";
 import { createBudget, getBudgetById, listBudgets } from "../services/budget.service";
 import { generateBudgetDocx } from "../services/docx.service";
 import { generateBudgetPdf } from "../services/pdf.service";
@@ -8,23 +8,23 @@ import { BudgetInput } from "../types/budget.types";
 /** Calcula o orcamento sem persistir - usado para simulacao instantanea no frontend. */
 export function simulate(req: Request, res: Response): void {
   const input = req.body as BudgetInput;
-  const result = calculateBudget(input);
+  const result = calculateBudgetTotals(input);
   res.json(result);
 }
 
 /** Cria e persiste um orcamento completo. */
-export function create(req: Request, res: Response): void {
+export async function create(req: Request, res: Response): Promise<void> {
   const input = req.body as BudgetInput;
-  const budget = createBudget(input);
+  const budget = await createBudget(input);
   res.status(201).json(budget);
 }
 
-export function list(_req: Request, res: Response): void {
-  res.json(listBudgets());
+export async function list(_req: Request, res: Response): Promise<void> {
+  res.json(await listBudgets());
 }
 
-export function getById(req: Request, res: Response): void {
-  const budget = getBudgetById(req.params.id);
+export async function getById(req: Request, res: Response): Promise<void> {
+  const budget = await getBudgetById(req.params.id);
   if (!budget) {
     res.status(404).json({ message: "Orcamento nao encontrado." });
     return;
@@ -33,7 +33,7 @@ export function getById(req: Request, res: Response): void {
 }
 
 export async function downloadPdf(req: Request, res: Response): Promise<void> {
-  const budget = getBudgetById(req.params.id);
+  const budget = await getBudgetById(req.params.id);
   if (!budget) {
     res.status(404).json({ message: "Orcamento nao encontrado." });
     return;
@@ -49,7 +49,7 @@ export async function downloadPdf(req: Request, res: Response): Promise<void> {
 }
 
 export async function downloadDocx(req: Request, res: Response): Promise<void> {
-  const budget = getBudgetById(req.params.id);
+  const budget = await getBudgetById(req.params.id);
   if (!budget) {
     res.status(404).json({ message: "Orcamento nao encontrado." });
     return;

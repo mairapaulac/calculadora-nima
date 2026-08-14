@@ -1,16 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createEmptyBudgetInput } from "../config/defaultBudgetInput";
 import { apiService } from "../services/api.service";
-import { simulateBudget } from "../services/calculation.service";
-import { AppConfig, Budget, BudgetInput, CostBreakdown } from "../types/budget.types";
+import { SimulatedTotals, simulateBudget } from "../services/calculation.service";
+import { AppConfig, Budget, BudgetInput } from "../types/budget.types";
 import { FormErrors, validateBudgetInput } from "../utils/validation";
 
-const EMPTY_COSTS: CostBreakdown = {
-  materialCost: 0,
-  machineCost: 0,
+const EMPTY_TOTALS: SimulatedTotals = {
+  printItemsCosts: [],
+  scanItemsCosts: [],
   modelingCost: 0,
-  scanningCost: 0,
-  slicingCost: 0,
   total: 0,
 };
 
@@ -35,9 +33,9 @@ export function useBudgetForm() {
       .catch(() => setConfigError("Nao foi possivel carregar as configuracoes do laboratorio."));
   }, []);
 
-  const costs = useMemo<CostBreakdown>(() => {
-    if (!config) return EMPTY_COSTS;
-    return simulateBudget(input, config);
+  const totals = useMemo<SimulatedTotals>(() => {
+    if (!config) return EMPTY_TOTALS;
+    return simulateBudget(input.printItems, input.scanItems, input.services.modeling, config);
   }, [input, config]);
 
   const updateInput = useCallback((updater: (draft: BudgetInput) => BudgetInput) => {
@@ -78,7 +76,7 @@ export function useBudgetForm() {
     configError,
     input,
     updateInput,
-    costs,
+    totals,
     errors,
     submitting,
     submitError,

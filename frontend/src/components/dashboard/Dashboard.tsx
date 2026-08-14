@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { apiService } from "../../services/api.service";
-import { Budget } from "../../types/budget.types";
+import { Budget, ComplexityLevel, PrintStatus } from "../../types/budget.types";
 import { formatBRL } from "../../utils/currency";
 import { Card } from "../common/Card";
 import { SummaryCards } from "./SummaryCards";
@@ -10,10 +10,145 @@ interface DashboardProps {
   refreshToken: number;
 }
 
+const STATUS_LABELS: Record<PrintStatus, string> = {
+  PENDENTE: "Pendente",
+  APROVADO: "Aprovado",
+  EM_PRODUCAO: "Em Produção",
+  CONCLUIDO: "Concluído",
+  CANCELADO: "Cancelado",
+};
+
+const STATUS_BADGE_CLASSES: Record<PrintStatus, string> = {
+  PENDENTE: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
+  APROVADO: "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300",
+  EM_PRODUCAO: "bg-brand-100 text-brand-700 dark:bg-brand-900/30 dark:text-brand-300",
+  CONCLUIDO: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
+  CANCELADO: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300",
+};
+
+const COMPLEXITY_LABELS: Record<ComplexityLevel, string> = {
+  BAIXA: "🟢 Baixa",
+  MEDIA: "🟡 Média",
+  ALTA: "🔴 Alta",
+};
+
+function StatusBadge({ status }: { status: PrintStatus }) {
+  return (
+    <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${STATUS_BADGE_CLASSES[status]}`}>
+      {STATUS_LABELS[status]}
+    </span>
+  );
+}
+
+function BudgetItemsDetail({ budget }: { budget: Budget }) {
+  return (
+    <div className="flex flex-col gap-4 bg-slate-50 p-4 dark:bg-slate-900/40">
+      {budget.printItems.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            Impressão 3D
+          </h4>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-left text-xs">
+              <thead>
+                <tr className="text-slate-400 dark:text-slate-500">
+                  <th className="py-1 pr-3">Código</th>
+                  <th className="py-1 pr-3">Peça</th>
+                  <th className="py-1 pr-3">Material</th>
+                  <th className="py-1 pr-3">Status</th>
+                  <th className="py-1 pr-3 text-right">Subtotal NIMA</th>
+                  <th className="py-1 pr-3 text-right">Taxa EJ (20%)</th>
+                  <th className="py-1 pr-3 text-right">Custo Insumo</th>
+                  <th className="py-1 pr-3 text-right">Lucro Lab</th>
+                  <th className="py-1 pr-3 text-right">Valor Final</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                {budget.printItems.map((item) => (
+                  <tr key={item.id}>
+                    <td className="py-1.5 pr-3 font-mono text-slate-500">{item.code}</td>
+                    <td className="py-1.5 pr-3 font-medium text-slate-700 dark:text-slate-200">
+                      {item.input.itemName}
+                    </td>
+                    <td className="py-1.5 pr-3 text-slate-500">{item.materialUsed.name}</td>
+                    <td className="py-1.5 pr-3">
+                      <StatusBadge status={item.input.status} />
+                    </td>
+                    <td className="py-1.5 pr-3 text-right text-slate-500">
+                      {formatBRL(item.costs.subtotalNima)}
+                    </td>
+                    <td className="py-1.5 pr-3 text-right text-slate-500">{formatBRL(item.costs.taxaEJ)}</td>
+                    <td className="py-1.5 pr-3 text-right text-slate-500">
+                      {formatBRL(item.input.custoInsumo)}
+                    </td>
+                    <td className="py-1.5 pr-3 text-right text-slate-500">{formatBRL(item.costs.lucroLab)}</td>
+                    <td className="py-1.5 pr-3 text-right font-semibold text-slate-800 dark:text-slate-100">
+                      {formatBRL(item.costs.valorFinalCobrado)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {budget.scanItems.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            Escaneamento 3D
+          </h4>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-left text-xs">
+              <thead>
+                <tr className="text-slate-400 dark:text-slate-500">
+                  <th className="py-1 pr-3">Código</th>
+                  <th className="py-1 pr-3">Peça</th>
+                  <th className="py-1 pr-3">Complexidade</th>
+                  <th className="py-1 pr-3">Pós-Processamento/Malha</th>
+                  <th className="py-1 pr-3">Status</th>
+                  <th className="py-1 pr-3 text-right">Valor Final</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                {budget.scanItems.map((item) => (
+                  <tr key={item.id}>
+                    <td className="py-1.5 pr-3 font-mono text-slate-500">{item.code}</td>
+                    <td className="py-1.5 pr-3 font-medium text-slate-700 dark:text-slate-200">
+                      {item.input.itemName}
+                    </td>
+                    <td className="py-1.5 pr-3 text-slate-500">
+                      {COMPLEXITY_LABELS[item.input.complexity]}
+                    </td>
+                    <td className="py-1.5 pr-3 text-slate-500">{item.input.postProcessing}</td>
+                    <td className="py-1.5 pr-3">
+                      <StatusBadge status={item.input.status} />
+                    </td>
+                    <td className="py-1.5 pr-3 text-right font-semibold text-slate-800 dark:text-slate-100">
+                      {formatBRL(item.costs.valorFinalCobrado)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {budget.input.services.modeling.enabled && (
+        <p className="text-xs text-slate-500">
+          Modelagem 3D: <span className="font-semibold text-slate-700 dark:text-slate-200">{formatBRL(budget.modelingCost)}</span>
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function Dashboard({ refreshToken }: DashboardProps) {
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -75,45 +210,57 @@ export function Dashboard({ refreshToken }: DashboardProps) {
                   <tr className="border-b border-slate-200 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:border-slate-800 dark:text-slate-400">
                     <th scope="col" className="py-3 pr-4 pl-2">Número</th>
                     <th scope="col" className="py-3 px-4">Solicitante</th>
-                    <th scope="col" className="py-3 px-4">Material</th>
+                    <th scope="col" className="py-3 px-4">Itens</th>
                     <th scope="col" className="py-3 px-4">Data</th>
                     <th scope="col" className="py-3 pl-4 pr-2 text-right">Total</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                  {budgets.map((budget) => (
-                    <tr
-                      key={budget.id}
-                      className="group transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/30"
-                    >
-                      <td className="whitespace-nowrap py-3 pr-4 pl-2 font-medium text-slate-900 dark:text-slate-100">
-                        {budget.budgetNumber}
-                        {/* Subtexto sutil para quem elaborou */}
-                        <span className="block text-xs font-normal text-slate-500">
-                          por {budget.input.attendedBy}
-                        </span>
-                      </td>
-                      <td className="whitespace-nowrap py-3 px-4 text-slate-600 dark:text-slate-300">
-                        {budget.input.requester.name}
-                      </td>
-                      <td className="whitespace-nowrap py-3 px-4">
-                        {/* Badge para o material */}
-                        <span className="inline-flex items-center rounded-md bg-brand-50 px-2 py-1 text-xs font-medium text-brand-700 ring-1 ring-inset ring-brand-600/10 dark:bg-brand-900/20 dark:text-brand-300 dark:ring-brand-900/50">
-                          {budget.details.materialUsed.name}
-                        </span>
-                      </td>
-                      <td className="whitespace-nowrap py-3 px-4 text-slate-500">
-                        {new Date(budget.createdAt).toLocaleDateString("pt-BR", {
-                          day: "2-digit",
-                          month: "short",
-                          year: "numeric"
-                        })}
-                      </td>
-                      <td className="whitespace-nowrap py-3 pl-4 pr-2 text-right font-semibold text-slate-900 dark:text-slate-100">
-                        {formatBRL(budget.costs.total)}
-                      </td>
-                    </tr>
-                  ))}
+                  {budgets.map((budget) => {
+                    const isExpanded = expandedId === budget.id;
+                    const itemCount = budget.printItems.length + budget.scanItems.length;
+                    return (
+                      <Fragment key={budget.id}>
+                        <tr
+                          onClick={() => setExpandedId(isExpanded ? null : budget.id)}
+                          className="group cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/30"
+                        >
+                          <td className="whitespace-nowrap py-3 pr-4 pl-2 font-medium text-slate-900 dark:text-slate-100">
+                            {budget.budgetNumber}
+                            <span className="block text-xs font-normal text-slate-500">
+                              por {budget.input.attendedBy}
+                            </span>
+                          </td>
+                          <td className="whitespace-nowrap py-3 px-4 text-slate-600 dark:text-slate-300">
+                            {budget.input.requester.name}
+                          </td>
+                          <td className="whitespace-nowrap py-3 px-4 text-slate-500">
+                            {budget.printItems.length > 0 && `${budget.printItems.length} impressão(ões)`}
+                            {budget.printItems.length > 0 && budget.scanItems.length > 0 && " · "}
+                            {budget.scanItems.length > 0 && `${budget.scanItems.length} escaneamento(s)`}
+                            {itemCount === 0 && "—"}
+                          </td>
+                          <td className="whitespace-nowrap py-3 px-4 text-slate-500">
+                            {new Date(budget.createdAt).toLocaleDateString("pt-BR", {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric"
+                            })}
+                          </td>
+                          <td className="whitespace-nowrap py-3 pl-4 pr-2 text-right font-semibold text-slate-900 dark:text-slate-100">
+                            {formatBRL(budget.total)}
+                          </td>
+                        </tr>
+                        {isExpanded && (
+                          <tr>
+                            <td colSpan={5} className="p-0">
+                              <BudgetItemsDetail budget={budget} />
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

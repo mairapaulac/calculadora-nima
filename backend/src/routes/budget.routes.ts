@@ -14,8 +14,8 @@ import { budgetInputSchema } from "../validators/budget.validator";
 export const budgetRouter = Router();
 
 budgetRouter.post("/simulate", validateBody(budgetInputSchema), simulate);
-budgetRouter.post("/", validateBody(budgetInputSchema), create);
-budgetRouter.get("/", list);
-budgetRouter.get("/:id", getById);
+budgetRouter.post("/", validateBody(budgetInputSchema), asyncHandler(create));
+budgetRouter.get("/", asyncHandler(list));
+budgetRouter.get("/:id", asyncHandler(getById));
 budgetRouter.get("/:id/pdf", asyncHandler(downloadPdf));
 budgetRouter.get("/:id/docx", asyncHandler(downloadDocx));

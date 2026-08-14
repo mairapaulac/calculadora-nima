@@ -3,16 +3,63 @@ import { calculationParameters } from "../config/pricing.config";
 import {
   AdditionalService,
   BudgetInput,
-  CalculationDetails,
-  CostBreakdown,
+  PrintItemCosts,
+  PrintItemInput,
+  ScanItemCosts,
+  ScanItemInput,
 } from "../types/budget.types";
 import { round2 } from "../utils/currency.utils";
 import { toDecimalHours } from "../utils/time.utils";
 
-/** Custo de um servico complementar (modelagem, escaneamento ou fatiamento). */
+/** Custo de um servico complementar global (atualmente apenas modelagem 3D). */
 function calculateServiceCost(service: AdditionalService): number {
   if (!service.enabled) return 0;
   return round2(service.hours * service.hourlyRate);
+}
+
+/** Calcula os custos de um item de impressao 3D: material + maquina + fatiamento + taxa EJ. */
+export function calculatePrintItemCosts(input: PrintItemInput): {
+  costs: PrintItemCosts;
+  printTimeDecimalHours: number;
+  materialUsed: ReturnType<typeof getMaterialByKey>;
+} {
+  const material = getMaterialByKey(input.materialKey);
+  const printTimeDecimalHours = toDecimalHours(input.printTime);
+
+  const materialCost = round2(input.weightInGrams * material.pricePerGram);
+
+  const effectiveMachineCostPerHour =
+    calculationParameters.machineCostPerHour *
+    (1 + calculationParameters.machineCostMarkupPercentage / 100);
+  const machineCost = round2(printTimeDecimalHours * effectiveMachineCostPerHour);
+
+  const slicingFee = input.slicing ? calculationParameters.slicingFlatFee : 0;
+
+  const subtotalNima = round2(materialCost + machineCost + slicingFee);
+  const taxaEJ = round2(subtotalNima * (calculationParameters.ejTaxPercentage / 100));
+  const valorFinalCobrado = round2(subtotalNima + taxaEJ);
+  const lucroLab = round2(subtotalNima - (input.custoInsumo || 0));
+
+  return {
+    costs: {
+      materialCost,
+      machineCost,
+      slicingFee,
+      subtotalNima,
+      taxaEJ,
+      valorFinalCobrado,
+      lucroLab,
+    },
+    printTimeDecimalHours: round2(printTimeDecimalHours),
+    materialUsed: material,
+  };
+}
+
+/** Calcula o custo de um item de escaneamento 3D: horas x valor-hora. */
+export function calculateScanItemCosts(input: ScanItemInput): ScanItemCosts {
+  return {
+    valorFinalCobrado: round2(input.scanTimeHours * input.hourlyRate),
+  };
 }
 
 /**
@@ -20,45 +67,22 @@ function calculateServiceCost(service: AdditionalService): number {
  * Toda a logica financeira da aplicacao vive aqui, para que
  * controllers/rotas e o frontend (simulacao) permanecam consistentes.
  */
-export function calculateBudget(input: BudgetInput): {
-  costs: CostBreakdown;
-  details: CalculationDetails;
+export function calculateBudgetTotals(input: BudgetInput): {
+  printItemsCosts: PrintItemCosts[];
+  scanItemsCosts: ScanItemCosts[];
+  modelingCost: number;
+  total: number;
 } {
-  const material = getMaterialByKey(input.print.materialKey);
-  const printTimeDecimalHours = toDecimalHours(input.print.printTime);
+  const printItemsCosts = input.printItems.map((item) => calculatePrintItemCosts(item).costs);
+  const scanItemsCosts = input.scanItems.map((item) => calculateScanItemCosts(item));
 
-  // 1. Custo de material = peso (g) x valor por grama do filamento
-  const materialCost = round2(input.print.weightInGrams * material.pricePerGram);
-
-  // 2. Custo de maquina (energia + desgaste combinados em um valor por hora,
-  //    acrescido da margem configurada)
-  const effectiveMachineCostPerHour =
-    calculationParameters.machineCostPerHour *
-    (1 + calculationParameters.machineCostMarkupPercentage / 100);
-  const machineCost = round2(printTimeDecimalHours * effectiveMachineCostPerHour);
-
-  // Servicos adicionais
   const modelingCost = calculateServiceCost(input.services.modeling);
-  const scanningCost = calculateServiceCost(input.services.scanning);
-  const slicingCost = calculateServiceCost(input.services.slicing);
 
   const total = round2(
-    materialCost + machineCost + modelingCost + scanningCost + slicingCost
+    printItemsCosts.reduce((sum, c) => sum + c.valorFinalCobrado, 0) +
+      scanItemsCosts.reduce((sum, c) => sum + c.valorFinalCobrado, 0) +
+      modelingCost
   );
 
-  const costs: CostBreakdown = {
-    materialCost,
-    machineCost,
-    modelingCost,
-    scanningCost,
-    slicingCost,
-    total,
-  };
-
-  const details: CalculationDetails = {
-    printTimeDecimalHours: round2(printTimeDecimalHours),
-    materialUsed: material,
-  };
-
-  return { costs, details };
+  return { printItemsCosts, scanItemsCosts, modelingCost, total };
 }

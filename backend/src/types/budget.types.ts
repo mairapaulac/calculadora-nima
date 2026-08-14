@@ -20,7 +20,7 @@ export interface MaterialConfig {
   pricePerGram: number;
 }
 
-/** Tempo de impressao informado pelo operador, em horas e minutos. */
+/** Tempo de impressao/escaneamento informado pelo operador, em horas e minutos. */
 export interface PrintTime {
   hours: number;
   minutes: number;
@@ -33,13 +33,73 @@ export interface RequesterData {
   projectDescription: string;
 }
 
-export interface PrintData {
+export type PrintStatus =
+  | "PENDENTE"
+  | "APROVADO"
+  | "EM_PRODUCAO"
+  | "CONCLUIDO"
+  | "CANCELADO";
+
+export type ScanStatus = PrintStatus;
+
+export type ComplexityLevel = "BAIXA" | "MEDIA" | "ALTA";
+
+/** Dados informados pelo operador para um item de impressao 3D dentro do orcamento. */
+export interface PrintItemInput {
+  itemName: string;
   materialKey: FilamentKey;
   weightInGrams: number;
   printTime: PrintTime;
+  quantity: number;
+  /** Fatiamento (Sim/Nao) - quando true, cobra a taxa fixa de fatiamento. */
+  slicing: boolean;
+  /** Custo real do insumo utilizado (compra do material), informado manualmente. */
+  custoInsumo: number;
+  status: PrintStatus;
 }
 
-/** Um servico complementar (modelagem, escaneamento ou fatiamento). */
+/** Detalhamento de custos calculados para um item de impressao. */
+export interface PrintItemCosts {
+  materialCost: number;
+  machineCost: number;
+  slicingFee: number;
+  subtotalNima: number;
+  taxaEJ: number;
+  valorFinalCobrado: number;
+  lucroLab: number;
+}
+
+export interface PrintItem {
+  id: string;
+  code: string;
+  input: PrintItemInput;
+  costs: PrintItemCosts;
+  materialUsed: MaterialConfig;
+  printTimeDecimalHours: number;
+}
+
+/** Dados informados pelo operador para um item de escaneamento 3D dentro do orcamento. */
+export interface ScanItemInput {
+  itemName: string;
+  scanTimeHours: number;
+  hourlyRate: number;
+  complexity: ComplexityLevel;
+  postProcessing: string;
+  status: ScanStatus;
+}
+
+export interface ScanItemCosts {
+  valorFinalCobrado: number;
+}
+
+export interface ScanItem {
+  id: string;
+  code: string;
+  input: ScanItemInput;
+  costs: ScanItemCosts;
+}
+
+/** Um servico complementar global do orcamento (atualmente apenas modelagem 3D). */
 export interface AdditionalService {
   enabled: boolean;
   hours: number;
@@ -48,33 +108,16 @@ export interface AdditionalService {
 
 export interface AdditionalServices {
   modeling: AdditionalService;
-  scanning: AdditionalService;
-  slicing: AdditionalService;
 }
 
 export interface BudgetInput {
   /** Integrante do laboratorio responsavel pela elaboracao deste orcamento. */
   attendedBy: string;
   requester: RequesterData;
-  print: PrintData;
+  printItems: PrintItemInput[];
+  scanItems: ScanItemInput[];
   services: AdditionalServices;
   notes?: string;
-}
-
-/** Detalhamento de custos calculados pela camada de servicos. */
-export interface CostBreakdown {
-  materialCost: number;
-  /** Custo de operacao da maquina (energia + desgaste combinados). */
-  machineCost: number;
-  modelingCost: number;
-  scanningCost: number;
-  slicingCost: number;
-  total: number;
-}
-
-export interface CalculationDetails {
-  printTimeDecimalHours: number;
-  materialUsed: MaterialConfig;
 }
 
 export interface Budget {
@@ -82,8 +125,10 @@ export interface Budget {
   budgetNumber: string;
   createdAt: string;
   input: BudgetInput;
-  costs: CostBreakdown;
-  details: CalculationDetails;
+  printItems: PrintItem[];
+  scanItems: ScanItem[];
+  modelingCost: number;
+  total: number;
 }
 
 export interface CalculationParameters {
@@ -91,6 +136,12 @@ export interface CalculationParameters {
   machineCostPerHour: number;
   /** Margem (%) aplicada em cima do custo de maquina por hora. */
   machineCostMarkupPercentage: number;
+  /** Taxa fixa de fatiamento (R$) cobrada por item de impressao quando habilitada. */
+  slicingFlatFee: number;
+  /** Percentual da taxa EJ aplicada sobre o subtotal NIMA de cada item de impressao. */
+  ejTaxPercentage: number;
+  /** Valor-hora padrao sugerido para servicos de escaneamento 3D. */
+  defaultScanningHourlyRate: number;
 }
 
 export interface LabInfo {
@@ -98,5 +149,13 @@ export interface LabInfo {
   document?: string;
   address?: string;
   contactEmail?: string;
-  contactPhone?: string;
+  whatsapp1?: string;
+  whatsapp2?: string;
+}
+
+export interface OptionsConfig {
+  printStatusOptions: Array<{ value: PrintStatus; label: string }>;
+  scanStatusOptions: Array<{ value: ScanStatus; label: string }>;
+  complexityOptions: Array<{ value: ComplexityLevel; label: string }>;
+  postProcessingOptions: string[];
 }

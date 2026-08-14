@@ -14,6 +14,7 @@ export const labMembers = [
   "Giovanna",
   "Igor",
   "Karen",
+  "Klivia",
 ] as const;
 
 export type LabMemberName = (typeof labMembers)[number];

@@ -7,7 +7,7 @@ interface SummaryCardsProps {
 }
 
 export function SummaryCards({ budgets }: SummaryCardsProps) {
-  const total = budgets.reduce((sum, budget) => sum + budget.costs.total, 0);
+  const total = budgets.reduce((sum, budget) => sum + budget.total, 0);
   const average = budgets.length > 0 ? total / budgets.length : 0;
 
   // Transformamos os items adicionando propriedades de ícone e cores temáticas

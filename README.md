@@ -5,11 +5,15 @@ laboratório de manufatura aditiva calcular o custo de uma demanda de impressão
 visualizar o orçamento em tempo real e gerar um documento (PDF e/ou DOCX) formatado
 para envio ao solicitante.
 
-Esta primeira versão persiste os orçamentos em um arquivo **SQLite** local (sem
-serviço de banco externo) — veja a seção [Persistência](#6-persistência-sqlite) — e
-toda a arquitetura já está preparada para a troca por um banco gerenciado completo
-sem impacto nas camadas de cálculo, controllers ou frontend (veja
-[Evoluções Futuras](#8-evoluções-futuras)).
+Um orçamento pode reunir **múltiplos itens** de dois tipos — Impressão 3D e
+Escaneamento 3D — cada um com seus próprios campos de controle interno (código,
+status, custo de insumo, lucro do laboratório etc.), somados num valor total.
+O documento entregue ao solicitante (PDF/DOCX) segue o template visual do NIMA:
+lista de itens + valor + total.
+
+Os orçamentos são persistidos em um banco **Postgres** externo (ex: [Neon](https://neon.tech))
+— veja a seção [Persistência](#6-persistência-postgres) — justamente para sobreviver
+a deploys/reinícios em hospedagens com disco efêmero (ex: Render free).
 
 ---
 
@@ -21,7 +25,8 @@ calculadoraNima/
 │   ├── src/
 │   │   ├── config/                 # Arquivos de configuração editáveis
 │   │   │   ├── materials.config.ts   # Materiais/filamentos e preços
-│   │   │   ├── pricing.config.ts     # Custo de máquina/hora, dados do lab
+│   │   │   ├── pricing.config.ts     # Custo de máquina/hora, taxas, dados do lab
+│   │   │   ├── options.config.ts     # Status, complexidade, pós-processamento
 │   │   │   ├── labMembers.config.ts  # Integrantes do laboratório
 │   │   │   └── index.ts
 │   │   ├── types/
@@ -31,7 +36,7 @@ calculadoraNima/
 │   │   ├── utils/
 │   │   │   ├── time.utils.ts       # Conversão horas/minutos -> decimal
 │   │   │   ├── currency.utils.ts   # Formatação BRL / arredondamento
-│   │   │   ├── id.utils.ts         # Geração do número do orçamento (sequência via SQLite)
+│   │   │   ├── id.utils.ts         # Geração de número/códigos sequenciais (contador no Postgres)
 │   │   │   └── asyncHandler.ts
 │   │   ├── services/               # Regras de negócio centralizadas
 │   │   │   ├── calculation.service.ts  # Fórmulas de custo (fonte da verdade)
@@ -39,9 +44,9 @@ calculadoraNima/
 │   │   │   ├── pdf.service.ts          # Geração do PDF (pdfkit)
 │   │   │   └── docx.service.ts         # Geração do DOCX (docx)
 │   │   ├── database/
-│   │   │   └── db.ts               # Conexão SQLite (node:sqlite)
+│   │   │   └── db.ts               # Conexão Postgres (pg)
 │   │   ├── repositories/
-│   │   │   └── budget.repository.ts # Armazenamento em SQLite (troque por outro DB aqui)
+│   │   │   └── budget.repository.ts # Armazenamento em Postgres
 │   │   ├── controllers/
 │   │   │   ├── budget.controller.ts
 │   │   │   └── materials.controller.ts
@@ -93,31 +98,50 @@ calculadoraNima/
 1. O operador preenche o formulário (`frontend`). A cada alteração, o
    `calculation.service.ts` do frontend recalcula os custos localmente
    (simulação instantânea, sem round-trip ao servidor).
-2. Ao clicar em **"Gerar Orçamento"**, os dados são validados e enviados para o
+2. O operador adiciona quantos **itens de impressão** e/ou **itens de escaneamento**
+   quiser dentro do mesmo orçamento (ex: mesma peça em tamanho original + miniatura).
+3. Ao clicar em **"Gerar Orçamento"**, os dados são validados e enviados para o
    backend (`POST /api/budgets`), que recalcula oficialmente com o
-   `calculation.service.ts` do backend (fonte da verdade), gera um número de
-   orçamento e persiste no SQLite.
-3. O operador pode então baixar o orçamento em **PDF** ou **DOCX**
-   (`GET /api/budgets/:id/pdf` e `/docx`), prontos para envio ao solicitante.
-4. A aba **Dashboard** lista os orçamentos gerados e totais agregados.
+   `calculation.service.ts` do backend (fonte da verdade), gera o número do
+   orçamento e o código de cada item (`ORC-001`, `ESC-001`, ...) e persiste no
+   Postgres.
+4. O operador pode então baixar o orçamento em **PDF** ou **DOCX**
+   (`GET /api/budgets/:id/pdf` e `/docx`) — documento com a marca do NIMA, um item
+   por linha e o total — prontos para envio ao solicitante.
+5. A aba **Dashboard** lista os orçamentos gerados; cada linha expande para mostrar
+   os campos internos de cada item (status, subtotal NIMA, taxa EJ, custo de
+   insumo, lucro do laboratório).
 
 ### Fórmulas de cálculo (`backend/src/services/calculation.service.ts`)
+
+**Item de Impressão 3D:**
 
 | Custo             | Fórmula                                                          |
 |-------------------|-------------------------------------------------------------------|
 | Material          | `peso (g) × valor por grama do filamento`                         |
 | Custo de Máquina  | `tempo de impressão (h) × custo de máquina por hora` (energia + desgaste combinados) |
-| Modelagem/Escaneamento/Fatiamento | `horas trabalhadas × valor por hora` (se habilitado) |
-| **Total**         | soma de todos os itens acima                                       |
+| Taxa de Fatiamento | `R$ 5,00` fixo, se o item tiver fatiamento habilitado             |
+| Subtotal NIMA     | soma dos três custos acima                                        |
+| Taxa EJ (20%)     | `Subtotal NIMA × 20%`                                             |
+| **Valor Final Cobrado** | `Subtotal NIMA + Taxa EJ`                                    |
+| Lucro Lab         | `Subtotal NIMA − Custo de Insumo` (custo de insumo é informado manualmente) |
+
+**Item de Escaneamento 3D:** `horas de escaneamento × valor por hora` = Valor Final Cobrado.
+
+**Modelagem 3D** (serviço único, opcional, no nível do orçamento): `horas × valor por hora`.
+
+**Total do orçamento** = soma do Valor Final Cobrado de todos os itens + Modelagem 3D.
 
 ### Configuração (edite sem tocar em código de negócio)
 
 - `backend/src/config/materials.config.ts` — nome, preço por kg de cada filamento
   (PLA, PETG, ABS, TPU, Nylon, Resina, Outros). O preço por grama é derivado
   automaticamente.
-- `backend/src/config/pricing.config.ts` — custo de máquina por hora de impressão
-  (já engloba energia + desgaste) e dados do laboratório exibidos no cabeçalho
-  do orçamento.
+- `backend/src/config/pricing.config.ts` — custo de máquina por hora, taxa fixa de
+  fatiamento, percentual da taxa EJ, valor-hora padrão de escaneamento e dados do
+  laboratório (nome, e-mail, WhatsApp) exibidos no orçamento gerado.
+- `backend/src/config/options.config.ts` — opções de status (impressão/escaneamento),
+  complexidade e pós-processamento/malha usadas nos formulários.
 - `backend/src/config/labMembers.config.ts` — integrantes do laboratório que podem
   ser selecionados como responsáveis pela elaboração de um orçamento.
 
@@ -128,14 +152,15 @@ alteração no backend já reflete na simulação instantânea sem duplicar conf
 
 ## 3. Instruções de Instalação
 
-Pré-requisitos: **Node.js 22.5+** (o backend usa o módulo nativo `node:sqlite` para
-persistência) e **npm**.
+Pré-requisitos: **Node.js 22.5+**, **npm** e um banco **Postgres** gratuito (ex:
+crie um projeto em [neon.tech](https://neon.tech) e copie a connection string).
 
 ```powershell
 # Backend
 cd backend
 npm install
 copy .env.example .env
+# edite o .env e preencha DATABASE_URL com a connection string do Postgres
 
 # Frontend (em outro terminal)
 cd frontend
@@ -199,23 +224,22 @@ npm run typecheck   # roda apenas a checagem de tipos (backend e frontend)
 
 ---
 
-## 6. Persistência (SQLite)
+## 6. Persistência (Postgres)
 
-Os orçamentos são armazenados em um arquivo **SQLite** local (`backend/data/budgets.db`
-por padrão, configurável via `DATABASE_PATH`), usando o módulo nativo `node:sqlite`
-do próprio Node.js — **sem dependências externas** e sem necessidade de compilação
-nativa (por isso não usamos `better-sqlite3`: exige Visual Studio Build Tools/
-node-gyp para compilar em máquinas sem binário pré-compilado para a versão do Node
-em uso).
+Os orçamentos são armazenados em um banco **Postgres** externo (ex: **Neon**, plano
+gratuito), configurado via `DATABASE_URL` (`backend/.env`). Isso substitui o SQLite
+local usado na primeira versão: em hospedagens com disco efêmero (ex: Render free),
+o arquivo local era apagado a cada novo deploy ou reinício do container — com o
+banco fora do processo da API, os dados sobrevivem a qualquer deploy/restart.
 
-> Requer **Node.js 22.5+** (o `node:sqlite` é experimental — o Node imprime um aviso
-> no console ao iniciar, mas funciona normalmente).
-
-O orçamento inteiro é salvo como JSON na coluna `payload`; é suficiente para o
-volume e as consultas deste sistema. Ao evoluir para um banco relacional completo
-(Postgres, etc.), a única camada que muda é `backend/src/repositories/budget.repository.ts`
-e `backend/src/utils/id.utils.ts` (numeração sequencial) — mantendo a mesma interface
-pública (`save`, `findById`, `list`).
+O orçamento inteiro continua salvo como JSON (`JSONB`) na coluna `payload` da
+tabela `budgets` — suficiente para o volume e as consultas deste sistema. Uma
+segunda tabela, `counters`, guarda contadores incrementados atomicamente
+(`INSERT ... ON CONFLICT DO UPDATE ... RETURNING`) usados para gerar o número do
+orçamento (`NIMA-2026-000001`) e os códigos de cada item (`ORC-001`, `ESC-001`).
+Ao evoluir para tabelas normalizadas, a única camada que muda é
+`backend/src/repositories/budget.repository.ts` e `backend/src/utils/id.utils.ts`,
+mantendo a mesma interface pública (`save`, `findById`, `list`).
 
 ---
 
@@ -252,28 +276,22 @@ configurando o serviço automaticamente: root directory `backend`, build
 1. Crie uma conta em [render.com](https://render.com) (grátis, sem cartão).
 2. **New +** → **Blueprint** → conecte o repositório do GitHub → o Render detecta
    o `render.yaml` e propõe criar o serviço `nima-backend` automaticamente.
-3. Na tela de revisão, defina o valor da variável `CORS_ORIGIN` (marcada como
-   `sync: false`, então o Render pede para preenchê-la) — pode deixar em branco
-   por enquanto e voltar depois de implantar o frontend.
+3. Na tela de revisão, defina os valores de `CORS_ORIGIN` e `DATABASE_URL` (ambas
+   marcadas como `sync: false`, então o Render pede para preenchê-las) —
+   `DATABASE_URL` é a connection string do seu projeto Neon/Postgres; `CORS_ORIGIN`
+   pode ficar em branco por enquanto e ser preenchida depois de implantar o frontend.
 4. Clique em **Apply**. Ao final, você terá uma URL como
    `https://nima-backend.onrender.com`.
 
 > Se a criação via Blueprint falhar ou você preferir configurar manualmente, crie um
 > **New + → Web Service** apontando para o repositório e preencha os mesmos campos
 > que estão no `render.yaml` (Root Directory `backend`, Build/Start Command acima,
-> Instance Type Free) — o resultado é idêntico.
+> Instance Type Free, mais as env vars `CORS_ORIGIN` e `DATABASE_URL`) — o resultado
+> é idêntico.
 
-**Importante sobre persistência no plano gratuito**: o disco do Render Free é
-**efêmero** — ele não some entre requisições, mas é **resetado a cada novo deploy**
-(e possivelmente após longos períodos de inatividade, quando o serviço "dorme" e
-sobe em uma nova instância). Ou seja, o SQLite evita perda de dados por *crash* do
-processo, mas não substitui um disco persistente de verdade nesse plano. Para
-persistência real e contínua em produção, os caminhos são:
-- Adicionar um **Persistent Disk** do Render (pago, a partir de poucos dólares/mês); ou
-- Migrar para um banco gerenciado com camada gratuita própria, ex: **Neon** ou
-  **Supabase** (Postgres) — ver seção de evoluções futuras abaixo.
-
-Para uma demonstração ao time ou uso leve, o comportamento atual já é suficiente.
+Como os dados agora ficam no Postgres externo (não no disco do container), o
+comportamento efêmero do Render Free — disco resetado a cada novo deploy ou ao
+"acordar" de um período de inatividade — deixa de ser um problema.
 
 ### Frontend na Vercel
 
@@ -298,8 +316,9 @@ navegador não bloquear as requisições por CORS.
 ## 8. Evoluções Futuras
 
 ### Banco de dados relacional completo
-- Trocar `backend/src/repositories/budget.repository.ts` por um ORM (ex: **Prisma**)
-  apontando para Postgres gerenciado (Neon, Supabase, Render Postgres).
+- Normalizar `budgets`/itens em tabelas próprias (em vez do payload JSON) e/ou
+  trocar as queries manuais por um ORM (ex: **Prisma**), reaproveitando a mesma
+  connection Postgres já configurada.
 - Normalizar `materials` e `labMembers` em tabelas próprias, com painel
   administrativo para editá-los sem precisar de redeploy.
 - Adicionar tabela `users` (para autenticação, abaixo).

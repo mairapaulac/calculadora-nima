@@ -1,44 +1,37 @@
-import { db } from "../database/db";
+import { sql } from "../database/db";
 import { Budget } from "../types/budget.types";
 
+/** payload chega como objeto (JSONB) via driver HTTP, mas normaliza caso venha como texto. */
+function parsePayload(payload: unknown): Budget {
+  return typeof payload === "string" ? (JSON.parse(payload) as Budget) : (payload as Budget);
+}
+
 /**
- * Repositorio de orcamentos persistido em SQLite (arquivo local).
+ * Repositorio de orcamentos persistido em Postgres.
  *
  * O orcamento completo e guardado como JSON na coluna `payload` - suficiente
  * para o volume e a natureza deste sistema (sem consultas relacionais
- * complexas). Ao evoluir para um banco relacional/gerenciado (Postgres, etc.),
- * normalizar essas colunas em tabelas proprias e trocar apenas este arquivo,
- * mantendo a mesma interface publica (save/findById/list).
+ * complexas). Ao evoluir para tabelas normalizadas, trocar apenas este
+ * arquivo, mantendo a mesma interface publica (save/findById/list).
  */
-const insertStmt = db.prepare(
-  `INSERT INTO budgets (id, budget_number, created_at, payload) VALUES (@id, @budgetNumber, @createdAt, @payload)`
-);
-const selectByIdStmt = db.prepare(`SELECT payload FROM budgets WHERE id = ?`);
-const selectAllStmt = db.prepare(`SELECT payload FROM budgets ORDER BY created_at DESC`);
-
-function parseRow(row: { payload: string }): Budget {
-  return JSON.parse(row.payload) as Budget;
-}
-
 class BudgetRepository {
-  save(budget: Budget): Budget {
-    insertStmt.run({
-      id: budget.id,
-      budgetNumber: budget.budgetNumber,
-      createdAt: budget.createdAt,
-      payload: JSON.stringify(budget),
-    });
+  async save(budget: Budget): Promise<Budget> {
+    await sql.query(
+      `INSERT INTO budgets (id, budget_number, created_at, payload) VALUES ($1, $2, $3, $4)`,
+      [budget.id, budget.budgetNumber, budget.createdAt, JSON.stringify(budget)]
+    );
     return budget;
   }
 
-  findById(id: string): Budget | undefined {
-    const row = selectByIdStmt.get(id) as { payload: string } | undefined;
-    return row ? parseRow(row) : undefined;
+  async findById(id: string): Promise<Budget | undefined> {
+    const rows = await sql.query(`SELECT payload FROM budgets WHERE id = $1`, [id]);
+    const row = rows[0] as { payload: unknown } | undefined;
+    return row ? parsePayload(row.payload) : undefined;
   }
 
-  list(): Budget[] {
-    const rows = selectAllStmt.all() as Array<{ payload: string }>;
-    return rows.map(parseRow);
+  async list(): Promise<Budget[]> {
+    const rows = await sql.query(`SELECT payload FROM budgets ORDER BY created_at DESC`);
+    return (rows as Array<{ payload: unknown }>).map((row) => parsePayload(row.payload));
   }
 }
 
