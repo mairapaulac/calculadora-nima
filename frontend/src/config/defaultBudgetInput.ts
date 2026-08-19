@@ -28,7 +28,6 @@ export function createEmptyPrintItem(): PrintItemInput {
     printTime: { hours: 0, minutes: 0 },
     quantity: 1,
     slicing: false,
-    custoInsumo: 0,
     status: "PENDENTE",
   };
 }

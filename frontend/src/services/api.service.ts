@@ -13,6 +13,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(body.message || "Erro ao comunicar com a API.");
   }
 
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
   return response.json() as Promise<T>;
 }
 
@@ -28,6 +32,8 @@ export const apiService = {
   listBudgets: () => request<Budget[]>("/budgets"),
 
   getBudget: (id: string) => request<Budget>(`/budgets/${id}`),
+
+  deleteBudget: (id: string) => request<void>(`/budgets/${id}`, { method: "DELETE" }),
 
   downloadFile: async (id: string, format: "pdf" | "docx"): Promise<Blob> => {
     const response = await fetch(`${API_URL}/budgets/${id}/${format}`);

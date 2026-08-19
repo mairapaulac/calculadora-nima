@@ -1,10 +1,12 @@
 import { createEmptyPrintItem } from "../../config/defaultBudgetInput";
-import { AppConfig, BudgetInput, FilamentKey, PrintItemInput, PrintStatus } from "../../types/budget.types";
+import { AppConfig, BudgetInput, FilamentKey, PrintItemInput } from "../../types/budget.types";
 import { FormErrors } from "../../utils/validation";
+import { simulateCustoInsumo } from "../../services/calculation.service";
+import { formatBRL } from "../../utils/currency";
 import { Card } from "../common/Card";
 import { Checkbox } from "../common/Checkbox";
-import { MoneyInput } from "../common/MoneyInput";
 import { NumberInput } from "../common/NumberInput";
+import { ReadOnlyField } from "../common/ReadOnlyField";
 import { SelectInput } from "../common/SelectInput";
 import { TextInput } from "../common/TextInput";
 
@@ -19,10 +21,6 @@ export function PrintItemsSection({ input, config, errors, onChange }: PrintItem
   const materialOptions = (config?.materials || []).map((material) => ({
     value: material.key,
     label: `${material.name} — R$ ${material.pricePerKg.toFixed(2)}/kg`,
-  }));
-  const statusOptions = (config?.options.printStatusOptions || []).map((o) => ({
-    value: o.value,
-    label: o.label,
   }));
   const slicingFee = config?.calculationParameters.slicingFlatFee ?? 5;
 
@@ -49,6 +47,7 @@ export function PrintItemsSection({ input, config, errors, onChange }: PrintItem
       <div className="flex flex-col gap-4">
         {input.printItems.map((item, index) => {
           const itemErrors = errors.printItems?.[index];
+          const custoInsumo = config ? simulateCustoInsumo(item, config) : 0;
           return (
             <div
               key={index}
@@ -82,6 +81,7 @@ export function PrintItemsSection({ input, config, errors, onChange }: PrintItem
                 <NumberInput
                   label="Peso da peça"
                   value={item.weightInGrams}
+                  step="any"
                   suffix="g"
                   error={itemErrors?.weightInGrams}
                   onChange={(value) => updateItem(index, { weightInGrams: value })}
@@ -104,23 +104,17 @@ export function PrintItemsSection({ input, config, errors, onChange }: PrintItem
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <NumberInput
                   label="Qtd. de peças/mesas"
                   value={item.quantity}
                   min={1}
                   onChange={(value) => updateItem(index, { quantity: value })}
                 />
-                <MoneyInput
+                <ReadOnlyField
                   label="Custo de insumo (real)"
-                  value={item.custoInsumo}
-                  onChange={(value) => updateItem(index, { custoInsumo: value })}
-                />
-                <SelectInput
-                  label="Status"
-                  value={item.status}
-                  options={statusOptions}
-                  onChange={(value) => updateItem(index, { status: value as PrintStatus })}
+                  value={formatBRL(custoInsumo)}
+                  hint="Calculado a partir do material, peso, tempo e quantidade."
                 />
               </div>
 

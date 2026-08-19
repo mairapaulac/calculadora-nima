@@ -8,6 +8,7 @@ export type FilamentKey =
   | "PLA"
   | "PETG"
   | "ABS"
+  | "ASA"
   | "TPU"
   | "NYLON"
   | "RESINA"
@@ -18,6 +19,8 @@ export interface MaterialConfig {
   name: string;
   pricePerKg: number;
   pricePerGram: number;
+  /** Custo real (R$/g) pago pelo laboratorio na compra do material - base do custo de insumo. */
+  insumoCostPerGram: number;
 }
 
 export interface PrintTime {
@@ -50,7 +53,6 @@ export interface PrintItemInput {
   printTime: PrintTime;
   quantity: number;
   slicing: boolean;
-  custoInsumo: number;
   status: PrintStatus;
 }
 
@@ -61,6 +63,8 @@ export interface PrintItemCosts {
   subtotalNima: number;
   taxaEJ: number;
   valorFinalCobrado: number;
+  /** Custo real do insumo consumido - derivado do material, peso, tempo e quantidade. */
+  custoInsumo: number;
   lucroLab: number;
 }
 
@@ -125,10 +129,14 @@ export interface Budget {
 }
 
 export interface CalculationParameters {
-  machineCostPerHour: number;
-  machineCostMarkupPercentage: number;
+  /** Multiplicador sobre o custo de insumo que compoe a parcela de material do subtotal NIMA. */
+  custoInsumoMarkupMultiplier: number;
+  /** Valor-hora (R$) cobrado do solicitante pelo uso da maquina (horas x quantidade). */
+  machineHourlyChargeRate: number;
   slicingFlatFee: number;
   ejTaxPercentage: number;
+  /** Custo real (R$/h) de operacao da maquina, usado no calculo do custo de insumo. */
+  insumoMachineCostPerHour: number;
   defaultScanningHourlyRate: number;
 }
 

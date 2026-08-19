@@ -14,26 +14,62 @@ function calculateServiceCost(service: AdditionalService): number {
   return round2(service.hours * service.hourlyRate);
 }
 
-/** Espelho client-side do calculo de um item de impressao (backend: calculation.service.ts). */
-export function simulatePrintItemCosts(item: PrintItemInput, config: AppConfig): PrintItemCosts {
+/**
+ * Espelho client-side do custo real de insumo (backend: calculateCustoInsumo).
+ * Sempre derivado - o operador nunca digita este valor:
+ *
+ *   (custo do material por grama x peso x quantidade)
+ * + (tempo de impressao em horas x quantidade x custo real de maquina por hora)
+ */
+export function simulateCustoInsumo(item: PrintItemInput, config: AppConfig): number {
   const material = config.materials.find((m) => m.key === item.materialKey);
+  const quantity = item.quantity || 0;
+
+  const materialInsumo = (item.weightInGrams || 0) * (material?.insumoCostPerGram || 0) * quantity;
+  const machineInsumo =
+    toDecimalHours(item.printTime) *
+    quantity *
+    config.calculationParameters.insumoMachineCostPerHour;
+
+  return round2(materialInsumo + machineInsumo);
+}
+
+/**
+ * Espelho client-side do calculo de um item de impressao (backend: calculation.service.ts).
+ * Subtotal NIMA:
+ *
+ *   (custo de insumo x multiplicador de markup)
+ * + (tempo de impressao em horas x quantidade x valor-hora de maquina cobrado)
+ * + (taxa fixa de fatiamento, se habilitado)
+ */
+export function simulatePrintItemCosts(item: PrintItemInput, config: AppConfig): PrintItemCosts {
   const printTimeDecimalHours = toDecimalHours(item.printTime);
+  const quantity = item.quantity || 0;
 
-  const materialCost = material ? round2((item.weightInGrams || 0) * material.pricePerGram) : 0;
+  const custoInsumo = simulateCustoInsumo(item, config);
+  const materialCost = round2(custoInsumo * config.calculationParameters.custoInsumoMarkupMultiplier);
 
-  const effectiveMachineCostPerHour =
-    config.calculationParameters.machineCostPerHour *
-    (1 + config.calculationParameters.machineCostMarkupPercentage / 100);
-  const machineCost = round2(printTimeDecimalHours * effectiveMachineCostPerHour);
+  const machineCost = round2(
+    printTimeDecimalHours * quantity * config.calculationParameters.machineHourlyChargeRate
+  );
 
   const slicingFee = item.slicing ? config.calculationParameters.slicingFlatFee : 0;
 
   const subtotalNima = round2(materialCost + machineCost + slicingFee);
   const taxaEJ = round2(subtotalNima * (config.calculationParameters.ejTaxPercentage / 100));
   const valorFinalCobrado = round2(subtotalNima + taxaEJ);
-  const lucroLab = round2(subtotalNima - (item.custoInsumo || 0));
+  const lucroLab = round2(subtotalNima - custoInsumo);
 
-  return { materialCost, machineCost, slicingFee, subtotalNima, taxaEJ, valorFinalCobrado, lucroLab };
+  return {
+    materialCost,
+    machineCost,
+    slicingFee,
+    subtotalNima,
+    taxaEJ,
+    valorFinalCobrado,
+    custoInsumo,
+    lucroLab,
+  };
 }
 
 /** Espelho client-side do calculo de um item de escaneamento. */

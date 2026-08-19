@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+
 interface NumberInputProps {
   label: string;
   value: number;
@@ -5,7 +7,7 @@ interface NumberInputProps {
   error?: string;
   min?: number;
   max?: number;
-  step?: number;
+  step?: number | "any";
   suffix?: string;
 }
 
@@ -21,6 +23,19 @@ export function NumberInput({
   suffix,
 }: NumberInputProps) {
   const inputId = label.toLowerCase().replace(/\s+/g, "-");
+  const [text, setText] = useState(String(value));
+
+  // Mantem o texto digitado como fonte da verdade da exibicao (evita reconstruir
+  // "0" + digito -> "013"); so re-sincroniza quando o valor muda por fora do input.
+  useEffect(() => {
+    setText((current) => (Number(current) === value ? current : String(value)));
+  }, [value]);
+
+  function handleChange(raw: string) {
+    setText(raw);
+    const parsed = Number(raw);
+    onChange(raw === "" || raw === "-" || !Number.isFinite(parsed) ? 0 : parsed);
+  }
 
   return (
     <div className="flex flex-col gap-1">
@@ -31,11 +46,13 @@ export function NumberInput({
         <input
           id={inputId}
           type="number"
-          value={Number.isFinite(value) ? value : 0}
+          value={text}
           min={min}
           max={max}
           step={step}
-          onChange={(e) => onChange(e.target.value === "" ? 0 : Number(e.target.value))}
+          onFocus={(e) => e.target.select()}
+          onChange={(e) => handleChange(e.target.value)}
+          onBlur={() => setText(String(value))}
           className={`w-full rounded-lg border px-3 py-2 text-sm outline-none transition focus:ring-2 focus:ring-brand-400 dark:bg-slate-800 dark:text-slate-100 ${
             error ? "border-red-400" : "border-slate-300 dark:border-slate-600"
           }`}

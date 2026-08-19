@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useState } from "react";
 import { apiService } from "../../services/api.service";
-import { Budget, ComplexityLevel, PrintStatus } from "../../types/budget.types";
+import { Budget, ComplexityLevel, PrintItem, PrintStatus } from "../../types/budget.types";
 import { formatBRL } from "../../utils/currency";
 import { Card } from "../common/Card";
 import { SummaryCards } from "./SummaryCards";
@@ -31,6 +31,16 @@ const COMPLEXITY_LABELS: Record<ComplexityLevel, string> = {
   MEDIA: "🟡 Média",
   ALTA: "🔴 Alta",
 };
+
+/**
+ * O custo de insumo passou a ser calculado e vive em `costs`. Orcamentos salvos
+ * antes dessa mudanca guardam o valor digitado em `input`, entao mantemos o
+ * fallback para que o historico continue exibindo o valor original.
+ */
+function printItemCustoInsumo(item: PrintItem): number {
+  const legacy = (item.input as { custoInsumo?: number }).custoInsumo;
+  return item.costs.custoInsumo ?? legacy ?? 0;
+}
 
 function StatusBadge({ status }: { status: PrintStatus }) {
   return (
@@ -79,7 +89,7 @@ function BudgetItemsDetail({ budget }: { budget: Budget }) {
                     </td>
                     <td className="py-1.5 pr-3 text-right text-slate-500">{formatBRL(item.costs.taxaEJ)}</td>
                     <td className="py-1.5 pr-3 text-right text-slate-500">
-                      {formatBRL(item.input.custoInsumo)}
+                      {formatBRL(printItemCustoInsumo(item))}
                     </td>
                     <td className="py-1.5 pr-3 text-right text-slate-500">{formatBRL(item.costs.lucroLab)}</td>
                     <td className="py-1.5 pr-3 text-right font-semibold text-slate-800 dark:text-slate-100">
@@ -149,6 +159,7 @@ export function Dashboard({ refreshToken }: DashboardProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -159,6 +170,22 @@ export function Dashboard({ refreshToken }: DashboardProps) {
       .catch(() => setError("Não foi possível carregar os orçamentos."))
       .finally(() => setLoading(false));
   }, [refreshToken]);
+
+  async function handleDelete(budget: Budget) {
+    if (!window.confirm(`Excluir o orçamento ${budget.budgetNumber}? Esta ação não pode ser desfeita.`)) {
+      return;
+    }
+    setDeletingId(budget.id);
+    try {
+      await apiService.deleteBudget(budget.id);
+      setBudgets((current) => current.filter((b) => b.id !== budget.id));
+      if (expandedId === budget.id) setExpandedId(null);
+    } catch {
+      setError("Não foi possível excluir o orçamento.");
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   return (
     <div className="flex flex-col gap-8">
@@ -212,7 +239,10 @@ export function Dashboard({ refreshToken }: DashboardProps) {
                     <th scope="col" className="py-3 px-4">Solicitante</th>
                     <th scope="col" className="py-3 px-4">Itens</th>
                     <th scope="col" className="py-3 px-4">Data</th>
-                    <th scope="col" className="py-3 pl-4 pr-2 text-right">Total</th>
+                    <th scope="col" className="py-3 px-4 text-right">Total</th>
+                    <th scope="col" className="py-3 pl-4 pr-2 text-right">
+                      <span className="sr-only">Ações</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
@@ -247,13 +277,26 @@ export function Dashboard({ refreshToken }: DashboardProps) {
                               year: "numeric"
                             })}
                           </td>
-                          <td className="whitespace-nowrap py-3 pl-4 pr-2 text-right font-semibold text-slate-900 dark:text-slate-100">
+                          <td className="whitespace-nowrap py-3 px-4 text-right font-semibold text-slate-900 dark:text-slate-100">
                             {formatBRL(budget.total)}
+                          </td>
+                          <td className="whitespace-nowrap py-3 pl-4 pr-2 text-right">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(budget);
+                              }}
+                              disabled={deletingId === budget.id}
+                              className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-900/20"
+                            >
+                              {deletingId === budget.id ? "Excluindo…" : "Excluir"}
+                            </button>
                           </td>
                         </tr>
                         {isExpanded && (
                           <tr>
-                            <td colSpan={5} className="p-0">
+                            <td colSpan={6} className="p-0">
                               <BudgetItemsDetail budget={budget} />
                             </td>
                           </tr>
