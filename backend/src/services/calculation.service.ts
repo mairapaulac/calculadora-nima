@@ -17,6 +17,24 @@ function calculateServiceCost(service: AdditionalService): number {
   return round2(service.hours * service.hourlyRate);
 }
 
+/**
+ * Custo real de insumo consumido por um item de impressao (nunca digitado pelo operador):
+ *
+ *   (custo do material por grama x peso x quantidade)
+ * + (tempo de impressao em horas x quantidade x custo real de maquina por hora)
+ */
+function calculateCustoInsumo(
+  input: PrintItemInput,
+  material: ReturnType<typeof getMaterialByKey>,
+  printTimeDecimalHours: number
+): number {
+  const quantity = input.quantity || 0;
+  const materialInsumo = input.weightInGrams * material.insumoCostPerGram * quantity;
+  const machineInsumo =
+    printTimeDecimalHours * quantity * calculationParameters.insumoMachineCostPerHour;
+  return round2(materialInsumo + machineInsumo);
+}
+
 /** Calcula os custos de um item de impressao 3D: material + maquina + fatiamento + taxa EJ. */
 export function calculatePrintItemCosts(input: PrintItemInput): {
   costs: PrintItemCosts;
@@ -25,20 +43,21 @@ export function calculatePrintItemCosts(input: PrintItemInput): {
 } {
   const material = getMaterialByKey(input.materialKey);
   const printTimeDecimalHours = toDecimalHours(input.printTime);
+  const quantity = input.quantity || 0;
 
-  const materialCost = round2(input.weightInGrams * material.pricePerGram);
+  const custoInsumo = calculateCustoInsumo(input, material, printTimeDecimalHours);
+  const materialCost = round2(custoInsumo * calculationParameters.custoInsumoMarkupMultiplier);
 
-  const effectiveMachineCostPerHour =
-    calculationParameters.machineCostPerHour *
-    (1 + calculationParameters.machineCostMarkupPercentage / 100);
-  const machineCost = round2(printTimeDecimalHours * effectiveMachineCostPerHour);
+  const machineCost = round2(
+    printTimeDecimalHours * quantity * calculationParameters.machineHourlyChargeRate
+  );
 
   const slicingFee = input.slicing ? calculationParameters.slicingFlatFee : 0;
 
   const subtotalNima = round2(materialCost + machineCost + slicingFee);
   const taxaEJ = round2(subtotalNima * (calculationParameters.ejTaxPercentage / 100));
   const valorFinalCobrado = round2(subtotalNima + taxaEJ);
-  const lucroLab = round2(subtotalNima - (input.custoInsumo || 0));
+  const lucroLab = round2(subtotalNima - custoInsumo);
 
   return {
     costs: {
@@ -48,6 +67,7 @@ export function calculatePrintItemCosts(input: PrintItemInput): {
       subtotalNima,
       taxaEJ,
       valorFinalCobrado,
+      custoInsumo,
       lucroLab,
     },
     printTimeDecimalHours: round2(printTimeDecimalHours),

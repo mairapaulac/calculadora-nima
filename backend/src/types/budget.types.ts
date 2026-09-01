@@ -8,6 +8,7 @@ export type FilamentKey =
   | "PLA"
   | "PETG"
   | "ABS"
+  | "ASA"
   | "TPU"
   | "NYLON"
   | "RESINA"
@@ -18,6 +19,8 @@ export interface MaterialConfig {
   name: string;
   pricePerKg: number;
   pricePerGram: number;
+  /** Custo real (R$/g) pago pelo laboratorio na compra do material - base do custo de insumo. */
+  insumoCostPerGram: number;
 }
 
 /** Tempo de impressao/escaneamento informado pelo operador, em horas e minutos. */
@@ -53,8 +56,6 @@ export interface PrintItemInput {
   quantity: number;
   /** Fatiamento (Sim/Nao) - quando true, cobra a taxa fixa de fatiamento. */
   slicing: boolean;
-  /** Custo real do insumo utilizado (compra do material), informado manualmente. */
-  custoInsumo: number;
   status: PrintStatus;
 }
 
@@ -66,6 +67,8 @@ export interface PrintItemCosts {
   subtotalNima: number;
   taxaEJ: number;
   valorFinalCobrado: number;
+  /** Custo real do insumo consumido - derivado do material, peso, tempo e quantidade. */
+  custoInsumo: number;
   lucroLab: number;
 }
 
@@ -132,14 +135,16 @@ export interface Budget {
 }
 
 export interface CalculationParameters {
-  /** Custo de operacao da maquina por hora de impressao (energia + desgaste combinados). */
-  machineCostPerHour: number;
-  /** Margem (%) aplicada em cima do custo de maquina por hora. */
-  machineCostMarkupPercentage: number;
+  /** Multiplicador sobre o custo de insumo que compoe a parcela de material do subtotal NIMA. */
+  custoInsumoMarkupMultiplier: number;
+  /** Valor-hora (R$) cobrado do solicitante pelo uso da maquina (horas x quantidade). */
+  machineHourlyChargeRate: number;
   /** Taxa fixa de fatiamento (R$) cobrada por item de impressao quando habilitada. */
   slicingFlatFee: number;
   /** Percentual da taxa EJ aplicada sobre o subtotal NIMA de cada item de impressao. */
   ejTaxPercentage: number;
+  /** Custo real (R$/h) de operacao da maquina, usado no calculo do custo de insumo. */
+  insumoMachineCostPerHour: number;
   /** Valor-hora padrao sugerido para servicos de escaneamento 3D. */
   defaultScanningHourlyRate: number;
 }

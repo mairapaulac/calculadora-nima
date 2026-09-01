@@ -10,6 +10,7 @@ const filamentKeySchema = z.enum([
   "PLA",
   "PETG",
   "ABS",
+  "ASA",
   "TPU",
   "NYLON",
   "RESINA",
@@ -61,7 +62,6 @@ const printItemSchema = z
     }),
     quantity: z.number().int().positive("Quantidade deve ser maior que zero."),
     slicing: z.boolean(),
-    custoInsumo: z.number().min(0),
     status: printStatusSchema,
   })
   .refine((item) => item.printTime.hours > 0 || item.printTime.minutes > 0, {

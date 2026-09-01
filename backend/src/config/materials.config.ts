@@ -7,22 +7,35 @@ import { FilamentKey, MaterialConfig } from "../types/budget.types";
  *
  * pricePerGram e derivado de pricePerKg, mas pode ser sobrescrito
  * manualmente caso o laboratorio negocie precos diferentes por grama.
+ *
+ * insumoCostPerGram (R$/g) e o custo REAL pago pelo laboratorio na compra do
+ * material - usado para calcular o custo de insumo (ver calculation.service.ts).
+ * PLACEHOLDER: revisar com o laboratorio antes de gerar orcamentos reais.
  */
-const rawMaterials: Array<{ key: FilamentKey; name: string; pricePerKg: number }> = [
-  { key: "PLA", name: "PLA", pricePerKg: 120 },
-  { key: "PETG", name: "PETG", pricePerKg: 140 },
-  { key: "ABS", name: "ABS", pricePerKg: 130 },
-  { key: "TPU", name: "TPU", pricePerKg: 180 },
-  { key: "NYLON", name: "Nylon", pricePerKg: 250 },
-  { key: "RESINA", name: "Resina", pricePerKg: 300 },
-  { key: "OUTROS", name: "Outros", pricePerKg: 150 },
+const rawMaterials: Array<{
+  key: FilamentKey;
+  name: string;
+  pricePerKg: number;
+  insumoCostPerKg: number;
+}> = [
+  { key: "PLA", name: "PLA", pricePerKg: 120, insumoCostPerKg: 70 },
+  { key: "PETG", name: "PETG", pricePerKg: 140, insumoCostPerKg: 85 },
+  { key: "ABS", name: "ABS", pricePerKg: 130, insumoCostPerKg: 75 },
+  { key: "ASA", name: "ASA", pricePerKg: 150, insumoCostPerKg: 90 },
+  { key: "TPU", name: "TPU", pricePerKg: 180, insumoCostPerKg: 110 },
+  { key: "NYLON", name: "Nylon", pricePerKg: 250, insumoCostPerKg: 160 },
+  { key: "RESINA", name: "Resina", pricePerKg: 300, insumoCostPerKg: 190 },
+  { key: "OUTROS", name: "Outros", pricePerKg: 150, insumoCostPerKg: 90 },
 ];
 
 export const materialsConfig: Record<FilamentKey, MaterialConfig> = rawMaterials.reduce(
   (acc, material) => {
     acc[material.key] = {
-      ...material,
+      key: material.key,
+      name: material.name,
+      pricePerKg: material.pricePerKg,
       pricePerGram: material.pricePerKg / 1000,
+      insumoCostPerGram: material.insumoCostPerKg / 1000,
     };
     return acc;
   },
