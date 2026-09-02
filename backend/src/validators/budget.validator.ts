@@ -14,6 +14,7 @@ const filamentKeySchema = z.enum([
   "TPU",
   "NYLON",
   "RESINA",
+  "PROPRIO",
   "OUTROS",
 ]);
 

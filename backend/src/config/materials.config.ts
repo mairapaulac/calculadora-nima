@@ -1,31 +1,28 @@
 import { FilamentKey, MaterialConfig } from "../types/budget.types";
 
 /**
- * Tabela de materiais/filamentos disponiveis e seus precos.
+ * Tabela de materiais/filamentos disponiveis e seu custo por quilo.
  * Edite este arquivo para atualizar valores ou adicionar novos materiais
  * sem tocar na logica de calculo.
  *
- * pricePerGram e derivado de pricePerKg, mas pode ser sobrescrito
- * manualmente caso o laboratorio negocie precos diferentes por grama.
+ * pricePerKg e o custo REAL pago pelo laboratorio na compra do material.
+ * Dele saem pricePerGram (exibido na lista de materiais do formulario) e
+ * insumoCostPerGram (base do custo de insumo - ver calculation.service.ts).
  *
- * insumoCostPerGram (R$/g) e o custo REAL pago pelo laboratorio na compra do
- * material - usado para calcular o custo de insumo (ver calculation.service.ts).
- * PLACEHOLDER: revisar com o laboratorio antes de gerar orcamentos reais.
+ * "Filamento proprio" cobre o caso em que o solicitante traz o material:
+ * custo zero, entao o orcamento cobra apenas maquina/fatiamento.
  */
-const rawMaterials: Array<{
-  key: FilamentKey;
-  name: string;
-  pricePerKg: number;
-  insumoCostPerKg: number;
-}> = [
-  { key: "PLA", name: "PLA", pricePerKg: 120, insumoCostPerKg: 70 },
-  { key: "PETG", name: "PETG", pricePerKg: 140, insumoCostPerKg: 85 },
-  { key: "ABS", name: "ABS", pricePerKg: 130, insumoCostPerKg: 75 },
-  { key: "ASA", name: "ASA", pricePerKg: 150, insumoCostPerKg: 90 },
-  { key: "TPU", name: "TPU", pricePerKg: 180, insumoCostPerKg: 110 },
-  { key: "NYLON", name: "Nylon", pricePerKg: 250, insumoCostPerKg: 160 },
-  { key: "RESINA", name: "Resina", pricePerKg: 300, insumoCostPerKg: 190 },
-  { key: "OUTROS", name: "Outros", pricePerKg: 150, insumoCostPerKg: 90 },
+const rawMaterials: Array<{ key: FilamentKey; name: string; pricePerKg: number }> = [
+  { key: "PLA", name: "PLA", pricePerKg: 115 },
+  { key: "PETG", name: "PETG", pricePerKg: 120 },
+  { key: "ABS", name: "ABS", pricePerKg: 85 },
+  { key: "ASA", name: "ASA", pricePerKg: 115 },
+  { key: "TPU", name: "TPU", pricePerKg: 111 },
+  { key: "NYLON", name: "Nylon", pricePerKg: 165 },
+  { key: "RESINA", name: "Resina ABS-Like", pricePerKg: 210 },
+  { key: "PROPRIO", name: "Filamento próprio", pricePerKg: 0 },
+  /** Fallback generico - ajustar quando o laboratorio definir um valor de referencia. */
+  { key: "OUTROS", name: "Outros", pricePerKg: 150 },
 ];
 
 export const materialsConfig: Record<FilamentKey, MaterialConfig> = rawMaterials.reduce(
@@ -35,7 +32,7 @@ export const materialsConfig: Record<FilamentKey, MaterialConfig> = rawMaterials
       name: material.name,
       pricePerKg: material.pricePerKg,
       pricePerGram: material.pricePerKg / 1000,
-      insumoCostPerGram: material.insumoCostPerKg / 1000,
+      insumoCostPerGram: material.pricePerKg / 1000,
     };
     return acc;
   },

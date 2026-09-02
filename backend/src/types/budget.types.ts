@@ -12,6 +12,8 @@ export type FilamentKey =
   | "TPU"
   | "NYLON"
   | "RESINA"
+  /** Material trazido pelo proprio solicitante - sem custo de insumo. */
+  | "PROPRIO"
   | "OUTROS";
 
 export interface MaterialConfig {
