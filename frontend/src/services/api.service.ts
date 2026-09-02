@@ -35,6 +35,10 @@ export const apiService = {
 
   deleteBudget: (id: string) => request<void>(`/budgets/${id}`, { method: "DELETE" }),
 
+  /** Cria a linha do orcamento na base do Notion, com o PDF anexado. */
+  sendBudgetToNotion: (id: string) =>
+    request<{ url: string }>(`/budgets/${id}/notion`, { method: "POST" }),
+
   downloadFile: async (id: string, format: "pdf" | "docx"): Promise<Blob> => {
     const response = await fetch(`${API_URL}/budgets/${id}/${format}`);
     if (!response.ok) {

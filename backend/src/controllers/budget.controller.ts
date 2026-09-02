@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { calculateBudgetTotals } from "../services/calculation.service";
 import { createBudget, getBudgetById, listBudgets } from "../services/budget.service";
 import { generateBudgetDocx } from "../services/docx.service";
+import { sendBudgetToNotion } from "../services/notion.service";
 import { generateBudgetPdf } from "../services/pdf.service";
 import { BudgetInput } from "../types/budget.types";
 
@@ -30,6 +31,18 @@ export async function getById(req: Request, res: Response): Promise<void> {
     return;
   }
   res.json(budget);
+}
+
+/** Envia o orcamento para a base do Notion, com o PDF anexado na linha criada. */
+export async function sendToNotion(req: Request, res: Response): Promise<void> {
+  const budget = await getBudgetById(req.params.id);
+  if (!budget) {
+    res.status(404).json({ message: "Orcamento nao encontrado." });
+    return;
+  }
+
+  const url = await sendBudgetToNotion(budget);
+  res.json({ url });
 }
 
 export async function downloadPdf(req: Request, res: Response): Promise<void> {

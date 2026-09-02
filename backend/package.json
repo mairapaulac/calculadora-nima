@@ -10,7 +10,8 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "notion:schema": "tsx scripts/notion-schema.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

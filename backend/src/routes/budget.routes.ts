@@ -5,6 +5,7 @@ import {
   downloadPdf,
   getById,
   list,
+  sendToNotion,
   simulate,
 } from "../controllers/budget.controller";
 import { validateBody } from "../middlewares/validateBody";
@@ -17,5 +18,6 @@ budgetRouter.post("/simulate", validateBody(budgetInputSchema), simulate);
 budgetRouter.post("/", validateBody(budgetInputSchema), asyncHandler(create));
 budgetRouter.get("/", asyncHandler(list));
 budgetRouter.get("/:id", asyncHandler(getById));
+budgetRouter.post("/:id/notion", asyncHandler(sendToNotion));
 budgetRouter.get("/:id/pdf", asyncHandler(downloadPdf));
 budgetRouter.get("/:id/docx", asyncHandler(downloadDocx));

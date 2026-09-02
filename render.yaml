@@ -11,3 +11,7 @@ services:
         sync: false
       - key: DATABASE_URL
         sync: false
+      - key: NOTION_TOKEN
+        sync: false
+      - key: NOTION_DATA_SOURCE_ID
+        sync: false

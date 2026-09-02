@@ -25,6 +25,13 @@ interface BudgetFormProps {
   onBudgetCreated?: () => void;
 }
 
+/** Estado do envio do orcamento para a base do Notion. */
+type NotionState =
+  | { status: "idle" }
+  | { status: "sending" }
+  | { status: "sent"; url: string }
+  | { status: "error"; message: string };
+
 export function BudgetForm({ onBudgetCreated }: BudgetFormProps) {
   const {
     config,
@@ -40,13 +47,35 @@ export function BudgetForm({ onBudgetCreated }: BudgetFormProps) {
     reset,
   } = useBudgetForm();
   const [downloading, setDownloading] = useState<"pdf" | "docx" | null>(null);
+  const [notion, setNotion] = useState<NotionState>({ status: "idle" });
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    setNotion({ status: "idle" });
     const budget = await submit();
     if (budget) {
       onBudgetCreated?.();
     }
+  }
+
+  /** Cria a linha do orcamento na base do Notion, com o PDF ja anexado. */
+  async function handleSendToNotion() {
+    if (!lastBudget) return;
+    setNotion({ status: "sending" });
+    try {
+      const { url } = await apiService.sendBudgetToNotion(lastBudget.id);
+      setNotion({ status: "sent", url });
+    } catch (error) {
+      setNotion({
+        status: "error",
+        message: error instanceof Error ? error.message : "Erro ao enviar para o Notion.",
+      });
+    }
+  }
+
+  function handleReset() {
+    reset();
+    setNotion({ status: "idle" });
   }
 
   async function handleDownload(format: "pdf" | "docx") {
@@ -123,9 +152,33 @@ export function BudgetForm({ onBudgetCreated }: BudgetFormProps) {
                     {downloading === "docx" ? "Gerando DOCX..." : "Baixar DOCX"}
                   </button>
                 </div>
+
                 <button
                   type="button"
-                  onClick={reset}
+                  onClick={handleSendToNotion}
+                  disabled={notion.status === "sending" || notion.status === "sent"}
+                  className="rounded-lg bg-slate-800 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-700 dark:hover:bg-slate-600"
+                >
+                  {notion.status === "sending" && "Enviando pro Notion..."}
+                  {notion.status === "sent" && "Enviado pro Notion ✓"}
+                  {(notion.status === "idle" || notion.status === "error") && "Enviar pro Notion"}
+                </button>
+
+                {notion.status === "sent" && (
+                  <a
+                    href={notion.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs text-brand-700 underline underline-offset-2 dark:text-brand-200"
+                  >
+                    Abrir no Notion
+                  </a>
+                )}
+                {notion.status === "error" && <p className="text-xs text-red-500">{notion.message}</p>}
+
+                <button
+                  type="button"
+                  onClick={handleReset}
                   className="text-xs text-slate-500 underline underline-offset-2 hover:text-slate-700 dark:text-slate-400"
                 >
                   Novo orçamento
